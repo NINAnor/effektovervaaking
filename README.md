@@ -1,6 +1,6 @@
-# nina-template-r
+# Elvesandjeger effect analysis workflow
 
-Modify this `README.md` file, to explain what your software does.
+The following workflow consists of 5 steps to transform the data, model the effect of the treatment on the elvesandjeger populations, and finally publish the results as figures.
 
 # Additional resources
 
