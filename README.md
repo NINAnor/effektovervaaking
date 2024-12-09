@@ -1,36 +1,23 @@
 # Elvesandjeger effect analysis workflow
+The following workflow consists of 5 steps to:
+1) Preprocessing of the data
+2) Calculate the density of elvesandjeger per clearing site
+3) Model the effect of the treatment on the elvesandjeger populations
+4) Transform the data to long format
+5) Publish the results as figures.
 
-The following workflow consists of 5 steps to transform the data, model the effect of the treatment on the elvesandjeger populations, and finally publish the results as figures.
+# Effektovervåking report
+The report describing and interpreting the results can be found here: https://brage.nina.no/nina-xmlui/handle/11250/2735576 and cited as:
+Roos, R., Evju, M., Endrestøl, A., Nowell, M., Hansen, O., Nordén, B., Andreasen, M., Kyrkjeeide, M.O., Bengtsson, F. & Hassel, K. 2024. Overvåking av effekter av tiltak for åtte trua arter og en naturtype i 2024. NINA Rapport 2538. Norsk institutt for naturforskning
 
 # Additional resources
+Previous years:
+2020: https://brage.nina.no/nina-xmlui/handle/11250/2653653
+2021: https://brage.nina.no/nina-xmlui/handle/11250/2735576
+2022: https://brage.nina.no/nina-xmlui/handle/11250/3035335
+2023: https://brage.nina.no/nina-xmlui/handle/11250/3056939
 
-In addition to this template, here is a list of useful resources you could start from:
-- https://github.com/NINAnor/NinaR
-
-# Good practices
-
-## .gitignore
-
-Add paths and files that you do not want to be committed by adding them to .gitignore.
-
-## pre-commit
-
-`pre-commit` can run tools to check your changes and refactor code (using `styler`), to keep your repository clean and avoid common mistakes. The list of actions that are executed are defined in `.pre-commit-config.yaml`.
-
-### Installation
-
-1. Install Python if not available. It can be downloaded from [python.org/downloads](https://www.python.org/downloads/). Be sure to add Python to your PATH.
-2. Install `pipx`, as it is the suggested way to install Python tools:
-   - Windows users: `py -3 -m pip install pipx`
-   - Linux users: `python3 -m pip install pipx`
-3. Install `pre-commit`: `pipx install pre-commit`
-4. Configure PATH: `pipx ensurepath`
-5. Close and open your shell again
-6. Enter into your git repository and install the hooks: `pre-commit install` (optional, but recommended)
-
-### How to use it
-
-In case you executed `pre-commit install`, `pre-commit` hooks will be executed each time you will try to commit (`git commit`). If any of the checks fail or if any files that is going to be committed is changed (because a tool refactored or cleaned it), the commit will fail.
-
-The suggested method to use `pre-commit` is to run it before trying to commit your changes, using `pre-commit run -a`. You can run this command multiple times, to check if the changes are ready to be committed.
-After all the tests succeeded, the changes can be staged (`git add`) and committed.
+# Repository structure
+Data: elvesandjeger and clearing history datasets
+R: R scripts
+Requirements: installation of R packages required to execute the code
