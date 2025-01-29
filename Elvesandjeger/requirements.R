@@ -1,0 +1,15 @@
+#Install all required libraries to execute the scripts
+
+install("readxl")
+install("dplyr")
+install("sf")
+install("here")
+install("tidyverse")
+install("raster")
+install("tidyr")
+install("dplyr")
+install("DHARMa")
+install("lme4")
+install("MASS")
+install("pscl")
+install("ggplot2")
