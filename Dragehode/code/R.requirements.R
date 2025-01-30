@@ -1,0 +1,13 @@
+#Required packages
+install.packages("tidyverse")
+install.packages("readxl")
+install.packages("vegan")
+install.packages("car")
+install.packages("goeveg")
+install.packages("ggrepel")
+install.packages("scales")
+install.packages("forcats")
+install.packages("ARTool")
+install.packages("ggpubr")
+install.packages("reshape2")
+install.packages("here")
