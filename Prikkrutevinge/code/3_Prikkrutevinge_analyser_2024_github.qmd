@@ -1,0 +1,319 @@
+---
+title: "Prikkrutevinge 2024"
+format: html
+editor: visual
+---
+
+## Language settings
+
+```{r}
+Sys.setlocale(locale='no_NB.utf8')
+```
+
+## Loading required packages
+
+```{r}
+library(readxl)
+library(tidyverse)
+library(lmerTest)
+library(DHARMa)
+library(emmeans)
+library(here)
+```
+
+## Importing data
+
+```{r}
+
+file_path <- here("Prikkrutevinge/data/Effekt_prikkrutevinge_2024_cleaned.xlsx")
+
+dat <- read_excel(file_path)
+
+```
+
+## Data calculations
+
+```{r}
+#We want to calculate average vegetation height per plot, per year
+
+dat <- dat %>% 
+  group_by(year, plot_id2) %>% 
+  rowwise() %>%
+  mutate(vegheight_mean = mean(c_across(vegheight1:vegheight4), na.rm  = TRUE)) %>%
+  ungroup() 
+
+#We want to calculate the number of species in flower
+dat <- dat %>% 
+  group_by(year, plot_id2) %>%
+  mutate(abundance_flowering = n_distinct(species[count_floral_stems > 0]))
+
+#For each plot, we want to calculate how often it was mown between 2022 and 2024. 
+#This requires some steps
+#Remove species-level duplication by summarizing data at the plot-year level
+plot_year_summary <- dat %>%
+  group_by(plot_id2, year) %>%
+  summarize(
+    treatment_t0 = first(treatment_t0), # Or any appropriate rule (e.g., unique())
+    treatment_t1 = first(treatment_t1),
+    treatment_t2 = first(treatment_t2),
+    treatment_t2 = first(treatment_t2),
+    .groups = "drop"
+  )
+
+# Calculate the total treatments received for each plot
+treatment_summary <- plot_year_summary %>%
+   group_by(plot_id2) %>%
+  mutate(
+    treatment_received_until_2024 = sum(
+      year == "2024" & c_across(starts_with("treatment_t")) == "slått",
+      na.rm = TRUE
+    )
+  ) %>%
+  ungroup()
+
+# Merge the result back to the original dataset to retain all rows
+dat <- dat %>%
+  left_join(
+    treatment_summary %>% select(year, plot_id2, treatment_received_until_2024),
+    by = c("year", "plot_id2"))
+
+#Now we can use the number of treatments received until 2024 as a grouping variable in figures. 
+```
+
+## Create figures
+
+```{r}
+#For making the figures, we can aggregate and just keep the first species
+
+dat_agg <- dat %>% 
+  group_by(plot_id2, year) %>% 
+  filter(!duplicated(plot_id2))
+
+```
+
+Make figure for vegetation height
+
+```{r}
+
+dat_agg$polygon_id <- as.factor(dat_agg$polygon_id)
+labels <- c("RT" = "Telefonstolpen", "RU" = "Utedassen")
+
+# Generate the plot
+p.veg_height <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>%
+  group_by(polygon_id, year, treatment_received_until_2024) %>% 
+  summarize(mean = mean(vegheight_mean), 
+            sd = sd(vegheight_mean),
+            n = n(),
+            se = sd / sqrt(n)) %>% 
+  ggplot(aes(x = as.factor(year), y = mean, fill = as.factor(treatment_received_until_2024))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = 0.2, position = position_dodge(width=0.9)) +
+  facet_wrap(~ polygon_id, labeller = labeller(polygon_id = labels)) +  # Apply custom labels
+  theme_classic() +
+  theme(strip.background = element_blank()) +
+  guides(fill = guide_legend(title="Antall ganger skjøtsel")) +
+  theme(legend.position="bottom")+
+  scale_fill_manual(values=c("#004F71","#E57200","#7A9A01")) +
+  labs(x = "År", y = "Vegetasjonshøyde (cm)") +
+  scale_y_continuous(expand = c(0, 0))
+
+# Print the plot
+p.veg_height
+
+```
+
+Make same figure for the number of smalkjempe
+
+```{r}
+
+p.host <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>%
+  group_by(polygon_id, year, treatment_received_until_2024) %>%
+  summarize(mean = mean(count_plantago), 
+            sd = sd(count_plantago),
+            n = n(),
+            se = sd / sqrt(n)) %>% 
+  ggplot(aes(x = as.factor(year), y = mean, fill = as.factor(treatment_received_until_2024))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = 0.2, position = position_dodge(width=0.9)) +
+  facet_wrap(~ polygon_id, labeller = labeller(polygon_id = labels)) +  # Apply custom labels
+  theme_classic() +
+  theme(strip.background = element_blank()) +
+  guides(fill = guide_legend(title="Antall ganger skjøtsel")) +
+  theme(legend.position="bottom")+
+  scale_fill_manual(values=c("#004F71","#E57200","#7A9A01")) +
+  labs(x = "År", y = "Antall smalkjemperosetter") +
+  scale_y_continuous(expand = c(0, 0))
+
+p.host
+
+```
+
+Make same figure for number of flowering stems
+
+```{r}
+
+p.pollinator <- dat %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% #Remove spinn ruter
+  group_by(year, plot_id2) %>% 
+  summarize(total_flowers = sum(count_floral_stems, na.rm = TRUE), 
+            treatment_received_until_2024 = first(treatment_received_until_2024), 
+            polygon_id = first(polygon_id)) %>% 
+  group_by(polygon_id, year, treatment_received_until_2024) %>% 
+  summarize(mean = mean(total_flowers), 
+            sd = sd(total_flowers),
+            n = n(),
+            se = sd / sqrt(n)) %>% 
+  ggplot(aes(x = as.factor(year), y = mean, fill = as.factor(treatment_received_until_2024))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = 0.2, position = position_dodge(width=0.9)) +
+  facet_wrap(~ polygon_id, labeller = labeller(polygon_id = labels)) +  # Apply custom labels
+  theme_classic() +
+  theme(strip.background = element_blank()) +
+  guides(fill = guide_legend(title="Antall ganger skjøtsel")) +
+  theme(legend.position="bottom")+
+  scale_fill_manual(values=c("#004F71","#E57200","#7A9A01")) +
+  labs(x = "År", y = "Antall blomsterstand av pollinatorplanter") +
+  scale_y_continuous(expand = c(0, 0))
+
+
+```
+
+Same figure for standing dead litter
+
+```{r}
+p.litter <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% #Remove spinn ruter
+  group_by(polygon_id, year, treatment_received_until_2024) %>% 
+  summarize(mean = mean(cover_standing_litter), 
+            sd = sd(cover_standing_litter),
+            n = n(),
+            se = sd / sqrt(n)) %>% 
+  ggplot(aes(x = as.factor(year), y = mean, fill = as.factor(treatment_received_until_2024))) +
+  geom_bar(position = "dodge", stat = "identity") +
+  geom_errorbar(aes(ymin = mean-se, ymax = mean+se), width = 0.2, position = position_dodge(width=0.9)) +
+  facet_wrap(~ polygon_id, labeller = labeller(polygon_id = labels)) +  # Apply custom labels
+  theme_classic() +
+  theme(strip.background = element_blank()) +
+  guides(fill = guide_legend(title="Antall ganger skjøtsel")) +
+  theme(legend.position="bottom")+
+  scale_fill_manual(values=c("#004F71","#E57200","#7A9A01")) +
+  labs(x = "År", y = "Dekning stående død biomasse (%)") +
+  scale_y_continuous(expand = c(0, 0))
+
+```
+
+## Statistics
+
+Vegetation height
+
+```{r}
+
+# Generate the data
+dat_height <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% 
+  select(polygon_id, plot_id2, year, vegheight_mean, treatment_received_until_2024)
+
+
+lm_height <- lmer(data = dat_height, vegheight_mean ~ polygon_id + as.factor(year) * treatment_received_until_2024 + (1| plot_id2))
+summary(lm_height)
+
+plot(lm_height)
+qqnorm(residuals(lm_height))
+plotQQunif(lm_height)#test is not significant, but looks a bit wonky visually
+plotResiduals(lm_height)#significant but doesn't look too bad
+# Obtain estimated marginal means (EMMs) for the interaction
+emm_interaction <- emmeans(lm_height, ~polygon_id + as.factor(year) * treatment_received_until_2024)
+# Perform pairwise comparisons
+pairwise_comparisons <- contrast(emm_interaction, method = "pairwise")
+# View results
+summary(pairwise_comparisons)
+
+group_diff_time1 <- emmeans(lm_height, ~ as.factor(year) | treatment_received_until_2024)
+pairwise_group_time1 <- contrast(group_diff_time1, method = "pairwise")
+summary(pairwise_group_time1)
+
+```
+
+Analyses for smalkjempe
+
+```{r}
+#Create data to run model on
+
+# Generate the data
+dat_host <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% 
+  select(polygon_id, plot_id2, year, count_plantago, treatment_received_until_2024)
+
+
+lm_host <- lmer(data = dat_host, count_plantago ~ polygon_id + as.factor(year) * treatment_received_until_2024 + (1| plot_id2))
+summary(lm_height)
+
+plot(lm_host)
+qqnorm(residuals(lm_host))
+plotQQunif(lm_host)#Looks pretty bad, the model is zero-inflated
+plotResiduals(lm_host)#Looks pretty bad, the model is zero-inflated
+
+```
+
+Analysis for number of flowering stems
+
+```{r}
+#Create data
+dat_pollinator <- dat %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% #Remove spinn ruter
+  group_by(year, plot_id2) %>% 
+  summarize(total_flowers = sum(count_floral_stems, na.rm = TRUE), 
+            treatment_received_until_2024 = first(treatment_received_until_2024), 
+            polygon_id = first(polygon_id))
+
+#Create model
+lm_pollinator <- lmer(data = dat_pollinator, total_flowers ~ polygon_id + as.factor(year) * treatment_received_until_2024 + (1| plot_id2))
+summary(lm_pollinator)
+
+plot(lm_pollinator)
+qqnorm(residuals(lm_pollinator))
+plotQQunif(lm_pollinator)#test is not significant
+plotResiduals(lm_pollinator)#significant but doesn't look too bad
+# Obtain estimated marginal means (EMMs) for the interaction
+emm_interaction <- emmeans(lm_pollinator, ~polygon_id + as.factor(year) * treatment_received_until_2024)
+# Perform pairwise comparisons
+pairwise_comparisons <- contrast(emm_interaction, method = "pairwise")
+# View results
+summary(pairwise_comparisons)
+
+group_diff_time1 <- emmeans(lm_pollinator, ~ as.factor(year) | treatment_received_until_2024)
+pairwise_group_time1 <- contrast(group_diff_time1, method = "pairwise")
+summary(pairwise_group_time1)
+
+```
+
+Analysis standing dead biomass
+
+```{r}
+#Generate the data
+
+dat_litter <- dat_agg %>% 
+  filter(!grepl("S", as.character(plot_id2), ignore.case = TRUE)) %>% #Remove spinn ruter
+  group_by(polygon_id, year, treatment_received_until_2024) %>% 
+  select(polygon_id, plot_id2, year, cover_standing_litter, treatment_received_until_2024)
+
+#Create model
+lm_litter <- lmer(data = dat_litter, cover_standing_litter ~ polygon_id + as.factor(year) * treatment_received_until_2024 + (1| plot_id2))
+summary(lm_litter)
+
+plot(lm_litter)
+qqnorm(residuals(lm_litter))
+plotQQunif(lm_litter)#test is not significant
+plotResiduals(lm_litter)#These are a bit wonky
+# Obtain estimated marginal means (EMMs) for the interaction
+emm_interaction <- emmeans(lm_litter, ~polygon_id + as.factor(year) * treatment_received_until_2024)
+# Perform pairwise comparisons
+pairwise_comparisons <- contrast(emm_interaction, method = "pairwise")
+# View results
+summary(pairwise_comparisons)
+
+
+
+```
