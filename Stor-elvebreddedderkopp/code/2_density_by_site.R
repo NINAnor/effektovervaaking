@@ -11,6 +11,7 @@ library(dplyr)
 library(sf)
 library(raster)
 library(tidyr)
+library(here)
 
 #A weighted density map was created for each 
 #variable (i.e- voksne, juvenile) using the observations 
@@ -36,8 +37,9 @@ j.2024 <- raster("./Stor-elvebreddedderkopp/data//density_juveniles_sep2024.tif"
 
 #PREPARATION OF THE DATAFRAME
 #The number of observations per site needs to be calculated. This is done by calculating the average density per site and multiplying it by the area of the site. Note that only observations from August are included to avoid double counting the the larvae in different stages. 
+str(sites)
 sites <- sites %>%
-  mutate(siteID = dense_rank(Lokalitet))
+  dplyr::mutate(siteID = dense_rank(Lokalitet))
 names(sites)
 head(sites)
 
