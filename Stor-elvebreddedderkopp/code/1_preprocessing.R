@@ -1,6 +1,6 @@
 #Script for preparing the data into a workable dataframe
 #Elvebreddedderkopp
-#Author: Megan
+#Author: Megan Nowell
 #Date: October 2024
 
 # Load the libraries
@@ -9,7 +9,7 @@ library(dplyr)
 library(sf)
 
 # Define the file path to your Excel file
-file_path <- here("./Stor-elvesbreddedderkopp/data/Arctosa-cinerea_Gaula2024.xlsx")
+file_path <- here("./Stor-elvebreddedderkopp/data/Arctosa-cinerea_Gaula2024.xlsx")
 
 # Read each sheet and add a month column
 data_juni <- read_excel(file_path, sheet = "juni") %>%
@@ -64,7 +64,7 @@ edderkopp <- merged_data %>%
 plot(st_geometry(edderkopp))
 
 #Write out data as a shapefile ##NOTE: dateTime field is altered to only date
-st_write(edderkopp, "./Stor-elvesbreddedderkopp/data/elvebreddedderkopp_obs_2024.shp")
+st_write(edderkopp, "./Stor-elvebreddedderkopp/data/elvebreddedderkopp_obs_2024.shp")
 
 #Write out only the data observations from August
 
