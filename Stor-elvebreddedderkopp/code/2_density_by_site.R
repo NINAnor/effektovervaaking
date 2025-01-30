@@ -91,11 +91,10 @@ str(site.dens)
 #Add area
 site.dens$area_m2 <- as.numeric(st_area(site.dens))
 
-head(site.dens)
 names(site.dens)
 
 #Convert all average densities to number of observations per lokalitet
-for (i in 28:37) {
+for (i in 23:32) {
   print(i)
   
   # Convert the character column to numeric
@@ -106,8 +105,5 @@ for (i in 28:37) {
 }
 
 
-str(site.dens)
-
-st_write(site.dens, "./Stor-elvebreddedderkopp/data/elvebreddedderkopp_results_2024.shp")
 st_write(site.dens, "./Stor-elvebreddedderkopp/data/elvebreddedderkopp_results_2024.csv")
 
