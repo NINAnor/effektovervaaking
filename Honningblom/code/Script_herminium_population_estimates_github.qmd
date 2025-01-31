@@ -623,3 +623,50 @@ df.pop <- df.pop %>%
 write.csv(df.pop, "./Honningblom/data/Herminium_pop_2024.csv")
 
 ```
+
+Create Figure
+
+{r}
+
+years <- sizes <- NULL
+for (loc in localities) {
+  years <- c(years, as.integer(dimnames(pop[[loc]]$size)[[2]]))
+  sizes <- c(sizes, log(pop[[loc]]$size["97.5%",]))
+}
+xlimits <- c(min(years) - 0.5, max(years) + 0.5)
+ylimits <- c(0, max(sizes) + 0.5)
+png("./Honningblom/Alle lokaliteter 2024.png", width = 840, height = 840)
+par(mfrow=c(2,2))
+for (loc in localities) {
+  plot(as.integer(dimnames(pop[[loc]]$size)[[2]]), 
+       log(pop[[loc]]$size["est",]),
+       col=1,pch=19,cex=1,type="o",
+       ylim=ylimits,xlim=xlimits,
+       xlab = expression(Aar), 
+       ylab = "Antall individer", axes = F,cex.lab=1.25,
+       main=loc)
+  axis(1,
+       at=c(xlimits[1],(xlimits[1]+0.5):(xlimits[2]-0.5)),
+       labels = c("",as.character((xlimits[1]+0.5):(xlimits[2]-0.5))),
+       pos=0,
+       cex.lab=1.25, 
+       cex.axis=1.25)
+  axis(2,
+       at=c(0,log(c(10,100,1000,10000,exp(ylimits[2])))),
+       labels = c("",as.character(c(10,100,1000,10000)),""),
+       pos=xlimits[1],
+       cex.lab=1.25, 
+       cex.axis=1.25)
+  polygon(c(as.integer(dimnames(pop[[loc]]$size)[[2]]),rev(as.integer(dimnames(pop[[loc]]$size)[[2]]))),
+          c(log(pop[[loc]]$size["97.5%",]),rev(log(pop[[loc]]$size["2.5%",]))),
+          col=rgb(0.5,0.5,0.5,alpha=0.2),border=NA)
+  points(as.integer(dimnames(pop[[loc]]$fert)[[2]]), 
+         log(pop[[loc]]$fert["est",]),col=2,pch=19,cex=1,type="o")
+  polygon(c(as.integer(dimnames(pop[[loc]]$fert)[[2]]),rev(as.integer(dimnames(pop[[loc]]$fert)[[2]]))),
+          c(log(pop[[loc]]$fert["97.5%",]),rev(log(pop[[loc]]$fert["2.5%",]))),
+          col=rgb(1,0,0,alpha=0.2),border=NA)
+}
+
+dev.off()
+
+
