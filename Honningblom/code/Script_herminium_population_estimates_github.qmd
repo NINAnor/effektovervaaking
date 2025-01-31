@@ -6,37 +6,39 @@ format: pdf
 pdf-engine: pdflatex
 ---
 
-About
+## About
 
 This script estimates population sizes of H. monorchis at the four localities on Hvaler, Norway.
 
-Language settings
+## Language settings
 
 Before getting started, we can run this line to make sure R can read Norwegian letters.
 
-{r}
+```{r}
  #| label: Language settings 
  #| warning: false
 
 Sys.setlocale(locale='no_NB.utf8')
+```
 
-Packages
+## Packages
 
 Load required packages
 
-{r}
+```{r}
  #| label: Language settings 
  #| warning: false
 library(here)
 library(boot)
 library(rio)
 library(reshape2)
+```
 
-Functions library
+## Functions library
 
 We first create a function library with the required functions. These are commented in Norwegian.
 
-{r}
+```{r}
  #| label: Function library 
  #| warning: false
 
@@ -237,12 +239,13 @@ estim.pop.size <- function(transektruteserier = NULL,
   return(list(popsize = popsize, fa = fa))
 }
 
+```
 
-Data import
+## Data import
 
 Let's import the data. There are three data files needed. The first contains data on the localities. The second contains observations of H. monorchis along transects. The last contains data on H. monorchis in the plots.
 
-{r}
+```{r}
  #| label: Importing data
  #| warning: false
 
@@ -252,12 +255,13 @@ df_locality <- read_excel(file_path, sheet="Locality", na=c("NA"))
 df_transect <- read_excel(file_path, sheet="Transect", na=c("NA"," "))
 df_plot <- read_excel(file_path, sheet="Plot_herminium",na=c("NA"))
 
+```
 
-Data wrangling
+## Data wrangling
 
 Before we can start the analyses, the data needs to be manipulated somewhat.
 
-{r}
+```{r}
  #| label: Data wrangling
  #| warning: false
 
@@ -282,12 +286,13 @@ df_plot$Plot_ID_new[df_plot$Plot_ID_old == "SKY.8.A"] <- "SKJ58"
 #rutedata$Rute <- rutedata$Rute.ID # Kopierer variabler for å unngå rekoding senere i skriptet
 
 #table(sort(df_plot$Plot_ID_new)) # Check
+```
 
-Population estimates
+## Population estimates
 
 Run the script to estimate population size for each locality.
 
-{r}
+```{r}
 # Les, initier og beregn designvariabler - felles kode for alle lokaliteter.
 
 roser <- unique(df_locality$Locality[df_locality$Design == "Rose"])
@@ -594,12 +599,13 @@ print(pop)
 #sink('pop2024.txt')
 #print(pop)
 #sink()
+```
 
-Exporting data
+## Exporting data
 
 Let's export the pop data we need as a data.frame.
 
-{r}
+```{r}
 #Get the data (list format) into a dataframe
 df.pop <- data.frame(melt(pop))
 df.pop <- df.pop %>% 
@@ -616,10 +622,11 @@ df.pop <- df.pop %>%
 #Export data
 write.csv(df.pop, "./Honningblom/data/Herminium_pop_2024.csv")
 
+```
 
-Create Figure
+## Create Figure
 
-{r}
+```{r}
 
 years <- sizes <- NULL
 for (loc in localities) {
@@ -661,4 +668,4 @@ for (loc in localities) {
 }
 
 dev.off()
-
+```
