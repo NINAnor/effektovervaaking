@@ -67,7 +67,7 @@ elvesandjeger <- merged_data %>%
 plot(st_geometry(elvesandjeger))
 
 #Write out data as a shapefile ##NOTE: dateTime field is altered to only date
-st_write(elvesandjeger, "./elvesandjeger_2024.shp")
+st_write(elvesandjeger, "./Elvesandjeger/data/elvesandjeger_2024.shp")
 
 #Write out only the data observations from August
 august <- elvesandjeger %>%
