@@ -74,4 +74,4 @@ august <- elvesandjeger %>%
   filter(month == "august")
 str(august)
 
-st_write(august,"./elvesandjeger_august_2024.shp" )
+st_write(august,"./Elvesandjeger/data/elvesandjeger_august_2024.shp" )
