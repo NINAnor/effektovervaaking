@@ -1,0 +1,212 @@
+---
+title: "GRUK_effekt_circles_2024"
+format: html
+editor: visual
+---
+
+## Introduction
+
+This script creates figures for the observations in circles. In addition, it contains some simple statistical tests.
+
+## Language settings
+
+```{r}
+Sys.setlocale("LC_CTYPE", "nb_NO.UTF-8")
+```
+
+## Install packages
+
+```{r}
+
+library(tidyverse)
+library(readxl)
+library(forcats)
+library(ggpubr)
+```
+
+## Import data
+
+The circle data available in datafile prepared by M. Evju.
+
+```{r}
+
+# Define the file path to your Excel file
+file_path <- here("Apen-grunnland-kalkmark/data/GRUK_nytt_format_copy.xlsx")
+
+# Read each sheet and add a month column
+dat_circles <- read_excel(file_path, sheet = "circles")
+
+```
+
+## Bleikøya
+
+Let's create a figure that shows the change in cover of:
+
+-   invasive species
+
+-   woody plants in field layer
+
+-   shrub layer
+
+-   canvas/tarp
+
+```{r}
+
+p_bleikøya_FA <- dat_circles %>% 
+  filter(Lokalitet == "Bleikøya") %>% 
+  ggplot(aes(x = Tid, y = Circle.invasive.species))+
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Tid", y = "Fremmedarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_bleikøya_woody_ground <- p_bleikøya_FA + aes(x = Tid, y = Circle.woody.field.layer) +
+  labs(y = "Vedplanter i feltsjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_bleikøya_shrubs <- p_bleikøya_FA + aes(x = Tid, y = Circle.shrub.layer) +
+  labs(y = "Busksjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_bleikøya_canvas <- p_bleikøya_FA + aes(x = Tid, y = as.numeric(Circle.canvas)) +
+  labs(y = "Duk (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+#Create one combined plot
+
+p_bleikøya_all <- ggarrange(p_bleikøya_canvas, p_bleikøya_FA, p_bleikøya_woody_ground, p_bleikøya_shrubs, labels = c("a", "b", "c", "d"), common.legend = TRUE, legend = "none", ncol = 2, nrow = 2)
+
+```
+
+## Padda
+
+For Padda, we only consider the plots that are in GRUK and ignore the ones that are located in the forest.
+
+```{r}
+
+plot_padda <- c("P1", "P10", "P15", "P2", "P3", "P4", "P5", "P5", "P6", "P9")
+
+p_padda_FA <- dat_circles %>% 
+  filter(Rute %in% plot_padda) %>% 
+  ggplot(aes(x = Tid, y = Circle.invasive.species))+
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Tid", y = "Fremmedarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_padda_PA <- p_padda_FA + aes(x = Tid, y = Circle.problematic.species)+
+  labs(y = "Problemarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))#her er sneglebelg med
+
+p_padda_woody_ground <- p_padda_FA + aes(x = Tid, y = Circle.woody.field.layer) +
+  labs(y = "Vedplanter i feltsjikt (%)")+
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_padda_shrubs <- p_padda_FA + aes(x = Tid, y = Circle.shrub.layer) +
+  labs(y = "Busksjikt (%)")
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+  
+p_padda_slitasje <- p_padda_FA + aes(x = Tid, y = as.numeric(Circle.erosion)) +
+  labs(y = "Slitasje (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_padda_vehicletracks <- p_padda_FA + aes(x = Tid, y = as.numeric(Circle.vehicle.tracks)) +
+  labs(y = "Kjørespor (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_padda_all <- ggarrange(p_padda_FA, p_padda_PA, p_padda_woody_ground, p_padda_shrubs, p_padda_vehicletracks, p_padda_slitasje, labels = c("a", "b", "c", "d", "e", "f"), common.legend = TRUE, legend = "none", ncol = 3, nrow = 2)
+
+
+```
+
+## Torvøya
+
+```{r}
+
+p_torvøya_FA <- dat_circles %>% 
+  filter(Lokalitet == "Torvøya") %>% 
+  ggplot(aes(x = Tid, y = Circle.invasive.species))+
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Tid", y = "Fremmedarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_torvøya_woody_ground <- p_torvøya_FA + aes(x = Tid, y = Circle.woody.field.layer) +
+  labs(y = "Vedplanter i feltsjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_torvøya_shrubs <- p_torvøya_FA + aes(x = Tid, y = Circle.shrub.layer) +
+  labs(y = "Busksjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_torvøya_all <- ggarrange(p_torvøya_FA, p_torvøya_woody_ground, p_torvøya_shrubs, labels = c("a", "b", "c"), common.legend = TRUE, legend = "none", ncol = 3, nrow = 1)
+
+
+```
+
+## **Malmøya**
+
+```{r}
+p_malmøya_FA <- dat_circles %>% 
+  filter(Lokalitet == "Malmøya") %>% 
+  ggplot(aes(x = Tid, y = Circle.invasive.species))+
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Tid", y = "Fremmedarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_malmøya_PA <- p_malmøya_FA + aes(x = Tid, y = Circle.problematic.species)+
+  labs(y = "Problemarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))#her er syrin med
+
+p_malmøya_woody_ground <- p_malmøya_FA + aes(x = Tid, y = Circle.woody.field.layer) +
+  labs(y = "Vedplanter i feltsjikt (%)")+
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+p_malmøya_shrubs <- p_malmøya_FA + aes(x = Tid, y = Circle.shrub.layer) +
+  labs(y = "Busksjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+  
+p_malmøya_trees <- p_malmøya_FA + aes(x = Tid, y = Circle.tree.layer) +
+  labs(y = "Tresjikt (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+  
+p_malmøya_slitasje <- p_malmøya_FA + aes(x = Tid, y = as.numeric(Circle.erosion)) +
+  labs(y = "Slitasje (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,100))
+
+
+p_malmøya_all <- ggarrange(p_malmøya_FA, p_malmøya_PA, p_malmøya_woody_ground, p_malmøya_shrubs, p_malmøya_trees, p_malmøya_slitasje, labels = c("a", "b", "c", "d", "e", "f"), common.legend = TRUE, legend = "none", ncol = 3, nrow = 2)
+
+
+```
+
+## Husbergøya
+
+```{r}
+p_husbergøya_FA <- dat_circles %>% 
+  filter(Lokalitet == "Husbergøya") %>% 
+  ggplot(aes(x = Tid, y = Circle.invasive.species))+
+  geom_boxplot() +
+  theme_classic() +
+  labs(x = "Tid", y = "Fremmedarter (%)") +
+  scale_y_continuous(expand = c(0, 0), limits = c(0,50))
+
+p_husbergøya_PA <- p_husbergøya_FA + aes(x = Tid, y = Circle.problematic.species)+
+  labs(y = "Problemarter (%)")
+
+p_husbergøya_woody_ground <- p_husbergøya_FA + aes(x = Tid, y = Circle.woody.field.layer) +
+  labs(y = "Vedplanter i feltsjikt (%)")
+
+p_husbergøya_shrubs <- p_husbergøya_FA + aes(x = Tid, y = Circle.shrub.layer) +
+  labs(y = "Busksjikt (%)")
+  
+p_husbergøya_trees <- p_husbergøya_FA + aes(x = Tid, y = Circle.tree.layer) +
+  labs(y = "Tresjikt (%)")
+  
+p_husbergøya_slitasje <- p_husbergøya_FA + aes(x = Tid, y = as.numeric(Circle.erosion)) +
+  labs(y = "Slitasje (%)") 
+
+
+p_husbergøya_all <- ggarrange(p_husbergøya_FA, p_husbergøya_PA, p_husbergøya_woody_ground, p_husbergøya_shrubs, p_husbergøya_trees, p_husbergøya_slitasje, labels = c("a", "b", "c", "d", "e", "f"), common.legend = TRUE, legend = "none", ncol = 3, nrow = 2)
+```
