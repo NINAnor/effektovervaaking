@@ -1,5 +1,7 @@
 #Required packages
 install.packages("tidyverse")
+install.packages("dplyr")
+install.packages("ggplot2")
 install.packages("readxl")
 install.packages("vegan")
 install.packages("car")
@@ -11,3 +13,4 @@ install.packages("ARTool")
 install.packages("ggpubr")
 install.packages("reshape2")
 install.packages("here")
+install.packages("data.table")
