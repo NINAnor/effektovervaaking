@@ -1,0 +1,1076 @@
+---
+title: "climate analyses"
+format: html
+editor: visual
+---
+
+About
+
+This script analyses climate logger data collected at several sites in Innlandet, Norway and and one site in TrC8nderlag, Norway. The aim of the analyses is to compare microclimate at the sites, and determine which environmental variables are most important for growth of translocated thalli of Erioderma pedicellatum.
+
+Language settings
+
+{r}
+Sys.setlocale(locale='no_NB.utf8')
+
+Required packages
+
+{r}
+library(tidyverse)
+library(vroom)
+library(janitor)
+library(lubridate)
+library(tidyr) 
+library(knitr)
+library(skimr)
+library(gt)
+library(readxl)
+library(lme4)
+library(lmerTest)
+library(emmeans)
+library(performance)
+library(MuMIn)
+library(broom.mixed)
+library(ggbeeswarm)
+
+Loading data and cleaning data
+
+Loading climate data
+
+There are several datasets to load here. Each logger has a file name with the logger number and locality name. We can use this to combine all the data into one big dataset.
+
+{r}
+
+data_folder <- "path ~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/08 TrC8nderlav/TrC8nderlav/data/climate_loggers"
+
+# 1. List all CSV files
+files <- list.files(path = data_folder, pattern = "\\.csv$", full.names = TRUE)
+
+# 2. Parse filename info function
+parse_filename <- function(filename) {
+  base <- basename(filename) %>% str_remove("\\.csv$")
+  parts <- str_split(base, " ")[[1]]
+  logger_locality <- parts[1]
+  date_str <- parts[2]
+  
+  logger_locality_parts <- str_split(logger_locality, "_")[[1]]
+  logger <- logger_locality_parts[1]
+  if (length(logger_locality_parts) > 2) {
+    type <- logger_locality_parts[length(logger_locality_parts)]
+    locality <- paste(logger_locality_parts[2:(length(logger_locality_parts)-1)], collapse = "_")
+  } else {
+    type <- NA_character_
+    locality <- logger_locality_parts[2]
+  }
+  
+  date <- as.Date(str_replace_all(date_str, "_", "-"))
+  
+  tibble(filename = filename,
+         logger = logger,
+         locality = locality,
+         date = date,
+         type = type)
+}
+
+# 3. Create file info table
+file_info <- map_dfr(files, parse_filename)
+
+# 4. Read and clean each file
+read_clean_file <- function(filepath) {
+  # --- Detect delimiter automatically ---
+  first_line <- readLines(filepath, n = 1)
+  if (grepl(";", first_line) && !grepl(",", first_line)) {
+    delim <- ";"
+  } else if (grepl(",", first_line) && !grepl(";", first_line)) {
+    delim <- ","
+  } else {
+    # If both or neither are found, try comma first
+    delim <- ","
+  }
+  
+  # --- Read file using detected delimiter ---
+  df <- vroom(filepath, delim = delim, show_col_types = FALSE)
+  
+  # Drop first 5 rows to remove sensor setup influence
+  df <- df %>% slice(-1:-5)
+  
+  # --- Parse timestamp (supports multiple date formats) ---
+  df <- df %>%
+    mutate(
+      # Replace '.' with '/' to normalize both formats
+      datetime_cet_cest = str_replace_all(datetime_cet_cest, "\\.", "/"),
+      
+      # Try multiple timestamp orders
+      timestamp = suppressWarnings(
+        parse_date_time(
+          datetime_cet_cest,
+          orders = c("mdy HMS", "dmy HMS", "mdy HM", "dmy HM"),
+          tz = "CET"
+        )
+      )
+    )
+  
+  # Warn if timestamp parsing fails
+  n_failed <- sum(is.na(df$timestamp))
+  if (n_failed > 0) {
+    warning(sprintf(
+      "Some timestamps failed to parse in file %s: %d rows",
+      basename(filepath), n_failed
+    ))
+  }
+  
+  # Drop original datetime column
+  df <- df %>% select(-datetime_cet_cest)
+  
+  return(df)
+}
+# 5. Read all data and combine
+all_data <- file_info %>%
+  mutate(data = map(filename, read_clean_file)) %>%
+  unnest(data)
+
+# 6. Add logger/locality info to combined data
+all_data <- all_data %>%
+  left_join(file_info %>% select(filename, logger, locality))
+
+# 7. Add type = "temp" for all data collected with the standard sensor ("lux" is already assign for the light sensors)
+
+all_data <- all_data %>% 
+  mutate(type = replace_na(type, "temp"))
+
+
+Explore and tidy climate data
+
+{r}
+
+glimpse(all_data)
+summary(all_data)
+
+
+#Create a summary for each numeric column. Let's look at min and max values, to see if there are some unrealistic values. And let's split it up per locality, so that it is easier to spot where the error comes from. 
+
+all_data %>%
+  filter(type == "temp") %>% #Change to "lux" to see the light loggers
+  group_by(locality) %>% 
+  summarise(across(where(is.numeric),
+                   list(min = ~min(., na.rm = TRUE),
+                        max = ~max(., na.rm = TRUE),
+                        mean = ~mean(., na.rm = TRUE),
+                        median = ~median(., na.rm = TRUE),
+                        missing = ~sum(is.na(.))))) %>%
+  pivot_longer(
+    cols = -locality,
+    names_to = c("variable", "stat"),
+    names_pattern = "^(.*)_(min|max|mean|median|missing)$"
+  ) %>%
+  pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>%
+  arrange(variable) %>%
+  knitr::kable(caption = "Summary Statistics for Numeric Columns")
+
+#Seems there are some unrealistic negative dewpoint temperatures at Tegningfallet2 
+#An RH of 0% is also not realistic, this is also at Tegningfallet2
+#Lux values go up to ca. 82.000 which is fairly realistic
+#Max and min temps look OK
+
+#Let's have a closer look at Tegningfallet2
+
+# Plot time series of dew point temperature
+all_data %>% 
+  filter(type == "temp") %>% 
+  filter(locality == "Tegningfallet2") %>% 
+ggplot(aes(x = timestamp, y = dew_point_C)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Temperatur (B0C)"
+  ) +
+  theme_minimal()
+
+all_data %>% 
+  filter(type == "temp") %>% 
+  filter(locality == "Tegningfallet2") %>% 
+ggplot(aes(x = timestamp, y = rh_percent)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Relative humidity %"
+  ) +
+  theme_minimal()
+
+#Let's find the specific rows
+
+df_faulty <- all_data %>%
+  filter(locality == "Tegningfallet2") %>% 
+  filter(dew_point_C == -273 | rh_percent == 0)
+
+#Both errors coinide, and we probably can't trust the temperature readings. So, when Tdew = -273, we want to replace the values for Tdew, Temp, and RH with "NA"
+
+
+all_data <- all_data %>% 
+  mutate(
+    temp_C = if_else(dew_point_C == -273, NA, temp_C),
+    dew_point_C = if_else(dew_point_C == -273, NA, dew_point_C),
+    rh_percent = if_else(dew_point_C == -273, NA, rh_percent)
+  )
+
+#Add year, day and month as variables
+all_data <- all_data %>% 
+  mutate(year = year(timestamp),
+         month = month(timestamp), 
+         day = day(timestamp))
+
+
+#Let's check some of the TrC8ndelag data
+
+all_data %>% 
+  filter(type == "temp") %>% 
+  filter(locality == "TrC8ndelag") %>% 
+ggplot(aes(x = timestamp, y = dew_point_C)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Temperatur (B0C)"
+  ) +
+  theme_minimal()
+
+
+
+
+Calculate absolute humidity
+
+{r}
+#from: https://carnotcycle.wordpress.com/2012/08/04/how-to-convert-relative-humidity-to-absolute-humidity/
+
+#Calculate absolute humidy in g/m3 of water vapor
+
+all_data <- all_data %>% 
+    mutate(humidity = (6.112 * exp((17.67 * temp_C) / (temp_C + 243.5)) * rh_percent * 2.1674) / (273.15 + temp_C))
+
+
+Aggregate data to daily means and variability (max - min)
+
+{r}
+daily_data <- all_data %>%
+  filter(type == "temp") %>% 
+  mutate(date = as_date(timestamp)) %>%
+  group_by(locality, date) %>%
+  summarise(
+    mean_temp_C = mean(temp_C, na.rm = TRUE),
+    mean_ah = mean(humidity, na.rm = TRUE), 
+    mean_dp = mean(dew_point_C, na.rm = TRUE), 
+    mean_rh = mean(rh_percent, na.rm = TRUE), 
+    range_temp_C = max(temp_C, na.rm = TRUE) - min(temp_C, na.rm = TRUE),
+    range_ah = max(humidity, na.rm = TRUE) - min(humidity, na.rm = TRUE),
+    range_dp = max(dew_point_C, na.rm = TRUE) - min(dew_point_C, na.rm = TRUE),
+    range_rh = max(rh_percent, na.rm = TRUE) - min(rh_percent, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(year = year(date)) %>% 
+  ungroup()
+
+
+daily_data_lux <- all_data %>%
+  filter(type == "lux") %>% 
+  mutate(date = as_date(timestamp)) %>%
+  group_by(locality, date) %>%
+  summarise(
+    mean_lux = mean(light_lux, na.rm = TRUE),
+    max_lux = max(light_lux), 
+    range_lux = max(light_lux, na.rm = TRUE) - min(light_lux, na.rm = TRUE),
+     .groups = "drop"
+  ) %>%
+  ungroup() %>% 
+  mutate(year = year(date)) %>% 
+  filter(range_lux >0)#remove two days with no variation in lux
+
+
+
+Loading ph and conductivity data
+
+{r}
+ph_data <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/08 TrC8nderlav/TrC8nderlav/data/ph data.xlsx", 
+    sheet = "Sheet1")
+
+ph_data <- ph_data %>% 
+  mutate(locality = factor(locality),
+         net_id      = factor(net_id))
+
+Loading thallus growth data
+
+{r}
+thalli_data <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/08 TrC8nderlav/TrC8nderlav/data/Area_lichens_2021_2022_2023_2024_2025.xlsx", 
+    sheet = "Sheet1")
+
+Cleaning thallus growth data
+
+{r}
+
+#Remove lines and columns we do not need
+thalli_data <- thalli_data %>% 
+    slice(1:(n() - 2)) %>% 
+    select(-c(`...14`, `...15`))
+
+#Rename columns
+thalli_data <- thalli_data %>% 
+  rename(locality = Lokalitet, 
+         thallus_id = Nb, 
+         areal_2021 = "Areal 2021 (cm2)", 
+         areal_2022 = "Areal 2022 (cm2)", 
+         areal_2023 = "Areal 2023 (cm2)",
+         areal_2024 = "Areal 2024 (cm2)",
+         areal_2025 = "Areal 2025 (cm2)", 
+         status = Status)
+
+#There is a typo in "Nekkfallet", which is spelled with one "k" only
+thalli_data <- thalli_data %>% 
+  mutate(locality = recode(locality, "Nekkfallet" = "Nekfallet"))
+
+#We need to make an ID for net, and one for thallus
+thalli_data <- thalli_data %>% 
+  mutate(net_id = str_extract(thallus_id, "^[^_]+"), # Extracts characters before the first underscore
+    thallus_id = thallus_id # Creates a copy of the original column
+  )
+
+#Create long format
+thalli_long <- thalli_data %>%
+  pivot_longer(
+    cols = starts_with("areal_"),          # columns to gather
+    names_to = "year",                    # new column for year
+    names_prefix = "areal_",               # remove the prefix 'area_'
+    values_to = "areal_cm2"                # new column for area values
+  ) %>%
+  mutate(
+    year = as.numeric(year),              # convert to numeric
+    areal_cm2 = as.numeric(areal_cm2)
+  )
+
+# Make sure keys are factors and area > 0
+# This also removes entries with areal_cm = NA, which basically trunkates the data to only contain only data for when the thalli were actuelly attached to the net, and excludes years where the thallus has dissapeared. 
+thalli_long <- thalli_long %>%
+  mutate(
+    locality = factor(locality),
+    net_id      = factor(net_id),
+    thallus_id  = factor(thallus_id)
+  ) %>%
+  filter(is.finite(areal_cm2), areal_cm2 > 0)
+
+#In 2023, the thalli where not completely saturated, which gives lower surface area than what is realistic, we can therefore remove the thallus measurements for 2023. 
+#thalli_long_cleaned <- thalli_long_cleaned %>% 
+#  filter(!year == 2023)
+
+Microclimatic differences between localities
+
+Plots for climate variables
+
+{r}
+
+#Reorder factor levels: 
+
+daily_data$locality <- factor(daily_data$locality,
+                     levels = c("Tegningfallet1", "Tegningfallet2", "EldC%a", "Nekfallet", "FlatdalsC%sen", "Gulsvikelvi", "SagC%a", "TrC8ndelag"))
+
+daily_data_lux$locality <- factor(daily_data_lux$locality,
+                     levels = c("Tegningfallet1", "Tegningfallet2", "EldC%a", "Nekfallet", "FlatdalsC%sen", "Gulsvikelvi", "SagC%a", "TrC8ndelag"))
+
+
+# Plot time series of temperature for all localities
+daily_data %>% 
+ggplot(aes(x = date, y = mean_temp_C)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Temperatur (B0C)"
+  ) +
+  facet_wrap(~locality)+
+  theme_minimal()
+
+#Calculate the max, min, and annual range in temperature for reach locality. 
+
+daily_data %>% 
+  filter(year == 2024) %>% 
+  group_by(locality) %>% 
+  summarize(max = max(mean_temp_C), 
+            min = min(mean_temp_C), 
+            diff = max - min)
+
+# Plot time series for relative humidity
+daily_data %>% 
+ggplot(aes(x = date, y = mean_rh)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Relativ luftfuktighet (%)"
+  ) +
+  facet_wrap(~locality)+
+  theme_minimal()
+
+daily_data %>% 
+  filter(year == 2024) %>% 
+  group_by(locality) %>% 
+  summarize(max = max(mean_rh), 
+            min = min(mean_rh), 
+            diff = max - min)
+
+
+# Plot time series for dew point
+daily_data %>% 
+ggplot(aes(x = date, y = mean_dp)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Duggpunkt (B0C)"
+  ) +
+  facet_wrap(~locality)+
+  theme_minimal()
+
+daily_data %>% 
+  filter(year == 2024) %>% 
+  group_by(locality) %>% 
+  summarize(max = max(mean_dp), 
+            min = min(mean_dp), 
+            diff = max - min)
+
+
+
+# Plot time series of absolute humidity for all localities
+daily_data %>% 
+ggplot(aes(x = date, y = mean_ah)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Duggpunkt (B0C)"
+  ) +
+  facet_wrap(~locality)+
+  theme_minimal()
+
+
+# Plot time series of light intensity for all localities
+daily_data_lux %>% 
+ggplot(aes(x = date, y = max_lux)) +
+  geom_line(color = "steelblue") +
+  labs(x = "Dato",
+    y = "Maksimal lysintensitet (lux)"
+  ) +
+  facet_wrap(~locality)+
+  theme_minimal() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+daily_data_lux %>% 
+  group_by(locality) %>% 
+  summarize(max = max(max_lux, na.rm = TRUE), 
+            min = min(max_lux, na.rm = TRUE), 
+            diff = max - min)
+
+
+#Make a comparison for the relative humidity between the sites compared with Tegningfallet1
+
+main_site <- "Tegningfallet1"
+
+# Separate out main site data
+main_data <- daily_data %>%
+  filter(locality == main_site) %>%
+  select(date, rh_main = mean_rh)
+
+# Join back by date, so each record has the main site's value for that day
+humidity_comparison <- daily_data %>%
+  left_join(main_data, by = "date") %>%
+  mutate(diff_rh = mean_rh - rh_main, 
+    rel_diff_rh = (mean_rh - rh_main) / rh_main
+  )
+
+#Add month and year
+humidity_comparison <- humidity_comparison %>% 
+  mutate(year = year(date), 
+         month = month(date))
+
+# plot
+
+humidity_comparison %>% 
+#  filter(month == 6 | month == 7 | month == 8) %>% 
+filter(!locality == "Tegningfallet1") %>%  
+ggplot(aes(x = locality, y = diff_rh)) +
+  stat_summary(fun = mean, geom = "bar", fill = "steelblue") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) + 
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Lokalitet",
+    y = "Forskjell i relativ luftfuktighet (%)"
+  ) +
+  theme_minimal()
+
+#Test differences in relative humidity with lmer
+model <- lmer(mean_rh ~ locality + (1 | date), data = daily_data)
+summary(model)
+emmeans(model, pairwise ~ locality, ref = "Tegningfallet1")
+
+
+#Make a comparison for the dew point temperature between the sites compared with Tegningfallet1
+
+main_site <- "Tegningfallet1"
+
+# Separate out main site data
+main_data <- daily_data %>%
+  filter(locality == main_site) %>%
+  select(date, dp_main = mean_dp)
+
+# Join back by date, so each record has the main site's value for that day
+dewpoint_comparison <- daily_data %>%
+  left_join(main_data, by = "date") %>%
+  mutate(diff_dp = mean_dp - dp_main, 
+    rel_diff_dp = (mean_dp - dp_main) / dp_main
+  )
+
+#Add month and year
+dewpoint_comparison <- dewpoint_comparison %>% 
+  mutate(year = year(date), 
+         month = month(date))
+
+# plot
+
+dewpoint_comparison %>% 
+#  filter(month == 6 | month == 7 | month == 8) %>% 
+filter(!locality == "Tegningfallet1") %>%  
+ggplot(aes(x = locality, y = diff_dp)) +
+  stat_summary(fun = mean, geom = "bar", fill = "steelblue") +
+  stat_summary(fun.data = mean_se, geom = "errorbar", width = 0.2) + 
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    x = "Lokalitet",
+    y = "Forskjell i duggpunkt (B0C)"
+  ) +
+  theme_minimal()
+
+
+
+
+
+
+Time with rh above threshold
+
+{r}
+
+#Let's explore which of the localities is humid the most amount of the time
+
+
+# set parameters
+threshold_RH   <- 90 # % rh we want to set, should correspond to ecological activity of lichen
+max_gap_hours  <- 6  # ignore intervals > this (e.g., logger outages)
+
+res_overall <- all_data %>%
+  filter(type == "temp") %>% 
+  arrange(locality, timestamp) %>%
+  group_by(locality) %>%
+  mutate(
+    dt_h   = as.numeric(difftime(lead(timestamp), timestamp, units = "hours")),
+    above  = rh_percent >= threshold_RH
+  ) %>%
+  # keep only real intervals; drop last row (NA dt), zero/neg dt, and long gaps
+  filter(!is.na(dt_h), dt_h > 0, dt_h <= max_gap_hours) %>%
+  summarise(
+    hours_above    = sum(above * dt_h, na.rm = TRUE),
+    hours_observed = sum(dt_h, na.rm = TRUE),
+    n_intervals    = sum(!is.na(dt_h)),     # count only non-NA intervals
+    pct_time_RH90  = 100 * hours_above / hours_observed,
+    .groups = "drop"
+  )
+
+
+res_overall$locality <- factor(res_overall$locality,
+                     levels = c("Tegningfallet1", "Tegningfallet2", "EldC%a", "Nekfallet", "FlatdalsC%sen", "Gulsvikelvi", "SagC%a", "TrC8ndelag"))
+
+
+
+#plot
+ggplot(res_overall, aes(locality, pct_time_RH90)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = sprintf("%.1f%%", pct_time_RH90)),
+            vjust = -0.4, size = 3.5) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     expand = expansion(mult = c(0, 0.06))) +
+  labs(
+    x = NULL,
+    y = "% av logget tid med relativ luftfuktighet b	% 90%")+
+ #   title = "Humidity saturation time by locality",
+ #   subtitle = sprintf("Intervals > %g h ignored; threshold = %g%% RH",
+ #                      max_gap_hours, threshold_RH) +
+ theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+
+
+
+
+#all_data %>%
+#  filter(type == "temp") %>% 
+#  arrange(locality, timestamp) %>%
+#  group_by(locality) %>%
+#  mutate(dt = as.numeric(difftime(lead(timestamp), timestamp, units = "hours")),
+#         above90 = rh_percent >= 90) %>%
+#  summarise(
+#    pct_time_rh90 = 100 * sum(above90 * dt, na.rm = TRUE) / sum(dt, na.rm = TRUE)
+#  )
+
+
+
+Time with light intensity above threshold
+
+{r}
+#Let's explore which of the localities has a decent light intensity for most of the time
+
+
+# set parameters
+threshold_lux   <- 10000 # % light level we want to set, should correspond to ecological activity of lichen
+max_gap_hours  <- 6  # ignore intervals > this (e.g., logger outages)
+
+res_overall <- all_data %>%
+  filter(type == "lux") %>% 
+  arrange(locality, timestamp) %>%
+  group_by(locality) %>%
+  mutate(
+    dt_h   = as.numeric(difftime(lead(timestamp), timestamp, units = "hours")),
+    above  = light_lux >= threshold_lux
+  ) %>%
+  # keep only real intervals; drop last row (NA dt), zero/neg dt, and long gaps
+  filter(!is.na(dt_h), dt_h > 0, dt_h <= max_gap_hours) %>%
+  summarise(
+    hours_above    = sum(above * dt_h, na.rm = TRUE),
+    hours_observed = sum(dt_h, na.rm = TRUE),
+    n_intervals    = sum(!is.na(dt_h)),     # count only non-NA intervals
+    pct_time_lux10k  = 100 * hours_above / hours_observed,
+    .groups = "drop"
+  )
+
+
+res_overall$locality <- factor(res_overall$locality,
+                     levels = c("Tegningfallet1", "Tegningfallet2", "EldC%a", "Nekfallet", "FlatdalsC%sen", "Gulsvikelvi", "SagC%a", "TrC8ndelag"))
+
+
+
+#plot
+ggplot(res_overall, aes(locality, pct_time_lux10k)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = sprintf("%.1f%%", pct_time_lux10k)),
+            vjust = -0.4, size = 3.5) +
+  scale_y_continuous(labels = function(x) paste0(x, "%"),
+                     expand = expansion(mult = c(0, 0.06))) +
+  labs(
+    x = NULL,
+    y = "% av logget tid med lysintensitet b	% 10000 lux",
+    subtitle = sprintf("Intervals > %g h ignored; threshold = %g%% lux",
+                       max_gap_hours, threshold_lux)) +
+  theme_minimal(base_size = 12) +
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1)
+  )
+
+
+
+Thallus growth analyses
+
+Model growth rate per thalli, effect of locality and climate
+
+With the data, we can try to calculate a growth rate for each individual thalli. We can then explore whether this growth rate differs between localities, and if climatic variables have anything to say about it.
+
+{r}
+
+#Step 1
+#We need to get yearly climate data, and add this to the thallus dataframe. Unfortunately, quite a few years do not have data, so we can just calculate an average for 2024, for which all the sites have data. 
+
+#Aggregate to yearly means
+yearly_data <- daily_data %>% 
+  filter(year == 2024) %>% 
+  filter(!locality == "Tegningfallet2") %>% #remove this logger as we do not have a lot of data from it, and we can use Tegningfallet1 in stead. 
+  filter(!locality == "TrC8ndelag") %>% #we can remove this one also, as no lichens are translocated to this site
+  group_by(locality) %>% 
+  summarize(mean_temp = mean(mean_temp_C), 
+            mean_rh = mean(mean_rh)) %>% 
+  mutate(locality = recode(locality,
+                           "Tegningfallet1" = "Tegningfallet"))
+  
+
+#We can also use the yearly max lux, but there are a lot of holes in the data, best not to use it then. More monitoring years are necessary!
+yearly_lux <- daily_data_lux %>% 
+  group_by(locality, year) %>% 
+  summarize(max_lux = max(max_lux))
+
+#let's join the climate data by year
+thalli_long_m <- thalli_long %>% 
+  left_join(yearly_data, by = "locality")
+
+#And let's join the ph and conductivity data also
+thalli_long_m <- thalli_long_m %>% 
+  left_join(ph_data, by = c("net_id", "locality"))
+
+#Add variables
+thalli_long_m <- thalli_long_m %>% 
+  mutate(log_areal = log(areal_cm2),
+    year_c = year - min(year, na.rm = TRUE))
+
+#We can summarize the variables measured at branch/net level to locality level
+data_substrate <- thalli_long_m %>%
+  group_by(locality) %>%
+  summarise(
+    substrate_ph = mean(ph_branch, na.rm = TRUE),
+    substrate_cond = mean(conductivity_branch, na.rm = TRUE))
+
+#Join susbtrate variables to the df
+thalli_long_m <- thalli_long_m %>%
+  left_join(data_substrate, by = "locality")
+
+
+#We need some further cleaning, and remove the thalli that only have one observation (i.e. they fell of the first year)
+thalli_long_m <- thalli_long_m %>%
+  group_by(thallus_id) %>%
+  filter(n() >= 2) %>%
+  ungroup()
+
+#And we want Tegningfallet as the reference site. 
+thalli_long_m_T <- thalli_long_m %>%
+  mutate(locality = relevel(factor(locality), ref = "Tegningfallet"))
+
+#Because the variables are at quite different scales, we need to do some rescaling (mean as 0, and sd as 1)
+thalli_long_m_T <- thalli_long_m_T %>%
+  mutate(across(c(year, mean_rh, mean_temp, ph_river, conductivity_river,
+                  ph_branch, conductivity_branch, substrate_ph, substrate_cond),
+                ~ as.numeric(scale(.)),
+                .names = "{.col}_z"))
+
+
+#Step 2 - model to find out at which locality growth is best
+#We have a nested structure: thallus b
+ net b
+ locality, with time (year_c) as a repeated measure. But, locality is something we are specifically interested in, so we have it as fixed effect in the model. 
+
+m_loc <- lmer(
+  log_areal ~ year_c * locality +
+    (year_c | thallus_id) + (1 | net_id),
+  data = thalli_long_m_T, REML = TRUE
+)
+summary(m_loc)
+
+# Estimated growth slopes per locality (on log scale)
+em_loc <- emtrends(m_loc, ~ locality, var = "year_c")
+summary(em_loc)                    # table of slopes B1 SE, p
+pairs(em_loc, adjust = "tukey") 
+
+summary(em_loc, infer = c(TRUE, TRUE))
+
+# Back-transform to % per year (approx)
+loc_slopes <- as.data.frame(em_loc)
+loc_slopes$growth_pct <- 100 * (exp(loc_slopes$year_c.trend) - 1)
+loc_slopes <- loc_slopes[order(-loc_slopes$growth_pct), ]  # rank from best growth
+
+
+#Conclusion: there are some significant differences in the starting size of the thalli between localities, with FlatdalsC%sen, Gulsvikelvi, og SagC%a having significantly smaller initial sizes than Tegningfallet. There is however a slight negative (but non-significant) growth rate over time, which does not differ between localities (all localities have non-significant negative growth rates). 
+
+#Step 3 - model to find out which locality environmental variables are the best predictors of growth. We do not include the branck-level measurements here. Although we could also make them a site level variable?
+
+#Run a full model
+options(na.action = "na.omit")
+m_full <- lmer(
+  log_areal ~ year_c * (mean_rh_z + mean_temp_z + ph_river_z + conductivity_river_z + substrate_ph_z + substrate_cond_z) +
+               (year_c | thallus_id) + (1 | net_id),
+  data = thalli_long_m_T,
+  REML = FALSE
+)
+check_collinearity(m_full)
+
+#This model is slightly over-specified, but as a full model we can live with that. Now let's do model selection to find out what really matters. 
+
+#Run AICc ranking, model selection
+options(na.action = "na.fail")
+m_dredge <- dredge(m_full, fixed = ~ year_c) #Always keep year
+options(na.action = "na.omit")   
+
+head(m_dredge)
+sw(m_dredge)
+m_best <- get.models(m_dredge, 1)[[1]]
+
+#The best model includes river conductivity, mean temperature, river ph, and year.
+
+m_final <- update(m_best, REML = TRUE)
+summary(m_final)
+
+#This shows that there is: 
+# A lower river condutctivity relates to a smaller initial thalli size (not so relevant)
+# Warmer sites had lower initial thalli sizes (not so relevant)
+# River ph had a trend for smaller inital thalli size
+# A general significant in thalli size with time
+# Decline accelerates at warmer sites b temperature suppresses growth rate.
+
+#Alternatively, we can make a model that isolates growth effects (in other words: the start point (intercept) becomes irrelevant). This will just check if the environmental variables have any impact on growth rates
+
+
+m_growth_focus <- lmer(
+  log_areal ~ year_c * (mean_rh_z + mean_temp_z + ph_river_z + conductivity_river_z + substrate_ph_z + substrate_cond_z) -
+               (mean_rh_z + mean_temp_z + ph_river_z + conductivity_river_z + substrate_ph_z + substrate_cond_z) +
+               (year_c | thallus_id) + (1 | net_id),
+  data = thalli_long_m_T,
+  REML = TRUE
+)
+summary(m_growth_focus)
+
+#This model shows that: 
+# There is an overal decline in thallus size over time
+# There is a non-significant mitigating effevt of humidity
+# there is a negative effect of temperature on growth (faster decline in thallus size at warmer sites)
+# River pH has no effect
+# River conductivity has a non-significant negative effect
+# substrate ph has a small, non-significant mitigating effect
+
+#Now lets make a figure
+
+# 1) Get locality-specific slopes of year_c
+em_loc <- emtrends(m_loc, ~ locality, var = "year_c")
+
+# 2) Tidy, back-transform to %/year, and sort
+loc_slopes <- as.data.frame(em_loc) %>%
+  mutate(
+    # slope is on log scale: convert to % change per year
+    growth_pct = 100 * (exp(year_c.trend) - 1),
+    lower_pct  = 100 * (exp(lower.CL)     - 1),
+    upper_pct  = 100 * (exp(upper.CL)     - 1),
+    locality   = fct_reorder(locality, growth_pct)  # order by growth
+  )
+
+# 3) Plot (points with 95% CI)
+
+my_cols <- c(
+  "Tegningfallet" = "#004F71",
+  "EldC%a"         = "#E57200",
+  "Nekfallet"     = "#93328E",
+  "SagC%a"         = "#7A9A01",
+  "FlatdalsC%sen"  = "#008C95",
+  "Gulsvikelvi"   = "#A2AAAD"
+)#Sets colors
+
+
+ggplot(loc_slopes, aes(x = locality, y = growth_pct, color = locality)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_pointrange(aes(ymin = lower_pct, ymax = upper_pct), position = position_dodge(width = 0.2)) +
+  scale_color_manual(values = my_cols) +
+  coord_flip() +
+  labs(
+    #title = "Modellert vekstrate per lokalitet",
+    #subtitle = "Estimert C%rlig endring (%) i thallusstC8rrelse",
+    x = NULL,
+    y = "Endring i thallusstC8rrelse (% p. C%r)"
+  ) +
+  theme_minimal()+ 
+  theme(legend.position = "none")
+
+
+
+Make a simple figure showing the raw data for thalli size
+
+{r}
+# Summarize mean and SE per year and locality
+size_summary <- thalli_long_m_T %>%
+  group_by(locality, year) %>%
+  summarise(
+    mean_log_areal = exp(mean(log_areal, na.rm = TRUE)),
+    se_log_areal   = exp(sd(log_areal, na.rm = TRUE) / sqrt(n())),
+    .groups = "drop"
+  )
+
+# Plot
+ggplot() +
+  # Raw data (all thalli)
+  geom_point(
+    data = thalli_long_m_T,
+    aes(x = year, y = exp(log_areal), color = locality),
+    position = position_jitter(width = 0.1, height = 0, seed = 123),
+    alpha = 0.3, size = 1.5
+  ) +
+  # Mean B1 SE trend per locality
+  geom_line(
+    data = size_summary,
+    aes(x = year, y = mean_log_areal, color = locality, group = locality),
+    linewidth = 1
+  ) +
+  geom_errorbar(
+    data = size_summary,
+    aes(x = year,
+        ymin = mean_log_areal - se_log_areal,
+        ymax = mean_log_areal + se_log_areal,
+        color = locality),
+    width = 0.1, linewidth = 0.6
+  ) +
+  geom_point(
+    data = size_summary,
+    aes(x = year, y = mean_log_areal, color = locality),
+    size = 2.5
+  ) +
+    facet_wrap(~ locality) +
+  labs(
+    title = "Utvikling i tallusstC8rrelse over tid per lokalitet",
+    x = "Cr",
+    y = "log(tallusstC8rrelse, cmB2)",
+    color = "Lokalitet"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    legend.position = "right"
+  )
+
+{r}
+
+thalli_long_m_T <- thalli_long_m_T %>%
+  mutate(locality = factor(locality,
+    levels = c("Tegningfallet", "EldC%a", "Nekfallet",
+               "SagC%a", "FlatdalsC%sen", "Gulsvikelvi")
+  ))
+
+ggplot(thalli_long_m_T, 
+       aes(x = year, y = exp(log_areal), group = thallus_id)) +
+  # individuelle thalli: tynne grC% linjer
+  geom_line(alpha = 0.3, color = "gray40") +
+  geom_point(alpha = 0.5, color = "gray30", size = 1.5) +
+
+  # gjennomsnittlig trend per lokalitet (valgfritt)
+  stat_summary(
+    fun = mean, geom = "line",
+    aes(group = locality),
+    color = "#0072B2", size = 1.2
+  ) +
+
+  facet_wrap(~ locality, scales = "free_y") +
+  labs(
+   # title = "Utvikling i tallusstC8rrelse (cmB2) over tid per lokalitet",
+    x = "Cr",
+    y = "TallusstC8rrelse (cmB2)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank()
+  )
+
+
+
+
+Or make a figure with the raw data including the model projections
+
+{r}
+#--- 1) A convenient real-year axis (since you modeled year_c)
+year0 <- min(thalli_long_m_T$year, na.rm = TRUE)
+
+#--- 2) Prediction grid across the observed range of year_c
+year_seq <- with(thalli_long_m_T, seq(min(year_c, na.rm = TRUE),
+                                      max(year_c, na.rm = TRUE),
+                                      length.out = 100))
+
+# Get marginal predictions per locality across time (fixed effects only)
+emm <- emmeans(
+  m_loc,
+  specs = ~ locality | year_c,
+  at    = list(year_c = year_seq),
+  type  = "link"   # model is on log scale; we'll back-transform manually
+)
+
+pred_df <- as.data.frame(emm) %>%
+  # 'emmean' is on the log scale; SE/CI columns are 'lower.CL'/'upper.CL' with KR/Satt DF
+  transmute(
+    locality,
+    year_c,
+    year      = year0 + year_c,
+    fit_cm2   = exp(emmean),
+    lwr_cm2   = exp(lower.CL),
+    upr_cm2   = exp(upper.CL)
+  )
+
+#--- 3) Plot: raw individual lines + model ribbon/line, faceted by locality
+ggplot() +
+  # Raw individual trajectories (each thallus)
+  geom_line(
+    data = thalli_long_m_T,
+    aes(x = year, y = exp(log_areal), group = thallus_id),
+    color = "grey40", alpha = 0.35, linewidth = 0.5
+  ) +
+  geom_point(
+    data = thalli_long_m_T,
+    aes(x = year, y = exp(log_areal)),
+    color = "grey30", alpha = 0.5, size = 1.2
+  ) +
+  # Model mean B1 95% CI
+  geom_ribbon(
+    data = pred_df,
+    aes(x = year, ymin = lwr_cm2, ymax = upr_cm2),
+    fill = "#5DADE2", alpha = 0.25
+  ) +
+  geom_line(
+    data = pred_df,
+    aes(x = year, y = fit_cm2),
+    color = "#1F77B4", linewidth = 1.2
+  ) +
+  facet_wrap(~ locality, scales = "free_y") +
+  labs(
+    title = "TallusstC8rrelse over tid per lokalitet: rC%data og modellert gjennomsnitt (B195% KI)",
+    x = "Cr",
+    y = "TallusstC8rrelse (cmB2)"
+  ) +
+  theme_minimal(base_size = 14) +
+  theme(
+    strip.text = element_text(face = "bold"),
+    plot.title = element_text(face = "bold", hjust = 0.5),
+    panel.grid.minor = element_blank()
+  ) 
+
+
+
+# 1. Get the observed year_c range per locality
+year_ranges <- thalli_long_m_T %>%
+  group_by(locality) %>%
+  summarise(min_year = min(year_c, na.rm = TRUE),
+            max_year = max(year_c, na.rm = TRUE))
+
+# 2. Get model predictions for all localities across full year range
+pred_full <- ggpredict(m_loc, terms = c("year_c", "locality"))
+
+pred_df <- as.data.frame(pred_full) 
+
+pred_df <- pred_df %>% 
+  rename(locality = "group")
+
+# 3. Join with observed year ranges and filter predictions
+pred_trimmed <- pred_df %>%
+  left_join(year_ranges, by =  "locality") %>%
+  filter(x >= min_year & x <= max_year)
+
+
+# 4. Make the plot
+
+my_cols <- c(
+  "Tegningfallet" = "#004F71",
+  "EldC%a"         = "#E57200",
+  "Nekfallet"     = "#93328E",
+  "SagC%a"         = "#7A9A01",
+  "FlatdalsC%sen"  = "#008C95",
+  "Gulsvikelvi"   = "#A2AAAD"
+)#Sets colors
+
+
+
+ggplot(thalli_long_m_T, aes(x = year_c, y = exp(log_areal))) +   # raw data
+  geom_line(aes(group = thallus_id), alpha = 0.3, color = "grey40") +
+  geom_point(alpha = 0.6, color = "black") +
+
+  # Model predictions (trimmed)
+  geom_ribbon(data = pred_trimmed,
+              aes(x = x, y = exp(predicted),
+                  ymin = exp(conf.low),
+                  ymax = exp(conf.high),
+                  fill = locality),
+              alpha = 0.15, inherit.aes = FALSE) +
+  geom_line(data = pred_trimmed,
+            aes(x = x, y = exp(predicted), color = locality),
+            size = 1.2, inherit.aes = FALSE) +
+  scale_color_manual(values = my_cols) +
+  scale_fill_manual(values = my_cols) +
+  facet_wrap(~ locality, scales = "free_y") +
+  labs(
+  #  title = "TallusstC8rrelse over tid per lokalitet",
+       x = "Cr (sentrert)",
+       y = "TallusstC8rrelse (cmB2)") +
+  theme_minimal() +
+  theme(legend.position = "none")
+
