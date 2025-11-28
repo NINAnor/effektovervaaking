@@ -13,15 +13,15 @@ library(cowplot)
 nina.colours <- c("#004F71","#008C95","#E57200","#93328E","#7A9A01","#A2AAAD","#2DCCD3","#FFB25B")
 
 ## henter inn data
-gruk25_plots <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="plots")
-gruk25_plotspecies <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="species.long")
-gruk25_circles <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="circles")
-gruk25_circlespecies <- read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="species.circles")
+gruk25_plots <- read_excel("path/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="plots")
+gruk25_plotspecies <- read_excel("path/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="species.long")
+gruk25_circles <- read_excel("path/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="circles")
+gruk25_circlespecies <- read_excel("path/Data/GRUK_effekt_data_2025_updated.xlsx",sheet="species.circles")
 
 ## henter inn lister over rC8dlistearter og habitatspesialister
-artsliste_rl <- read_excel("/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_artslister.xlsx",sheet="RL")
-artsliste_hs <- read_excel("/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_artslister.xlsx",sheet="HS")
-artsliste_fa <- read_excel("/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Data/GRUK_artslister.xlsx",sheet="FA") # NB denne inneholder arter per 2023, og er ikke kompatibel med vC%re analyser... Vinterkarse, syrin osv. 
+artsliste_rl <- read_excel("path/Data/GRUK_artslister.xlsx",sheet="RL")
+artsliste_hs <- read_excel("path/Data/GRUK_artslister.xlsx",sheet="HS")
+artsliste_fa <- read_excel("path/Data/GRUK_artslister.xlsx",sheet="FA") # NB denne inneholder arter per 2023, og er ikke kompatibel med vC%re analyser... Vinterkarse, syrin osv. 
 
 ## tar ut skogsrutene pC% Padda
 gruk25_plots <- gruk25_plots %>%
@@ -268,7 +268,7 @@ gbk_feltsjikt <- ggplot(gbk_summary_data, aes(x = Lokalitet_ny, y = mean_dekning
   )
 
 gbk_veg <- plot_grid(gbk_ant_arter,gbk_feltsjikt,ncol = 2)
-ggsave("GBK_veg.jpeg", plot = gbk_veg, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("GBK_veg.jpeg", plot = gbk_veg, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ## figurer: antall og dekning av habitatspesialister
@@ -322,7 +322,7 @@ gbk_ab_hs <- ggplot(gbk_summary_data, aes(x = Lokalitet_ny, y = mean_ab_hs, fill
   )
 
 gbk_hs <- plot_grid(gbk_ant_hs,gbk_ab_hs,ncol = 2)
-ggsave("GBK_HS.jpeg", plot = gbk_hs, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("GBK_HS.jpeg", plot = gbk_hs, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ## figurer: antall og dekning av rC8dlistearter
@@ -376,7 +376,7 @@ gbk_ab_rl <- ggplot(gbk_summary_data, aes(x = Lokalitet_ny, y = mean_ab_rl, fill
   )
 
 gbk_rl <- plot_grid(gbk_ant_rl,gbk_ab_rl,ncol = 2)
-ggsave("GBK_RL.jpeg", plot = gbk_rl, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("GBK_RL.jpeg", plot = gbk_rl, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ## figurer: antall og dekning av fremmedarter i rutene
@@ -430,7 +430,7 @@ gbk_ab_fa <- ggplot(gbk_summary_data, aes(x = Lokalitet_ny, y = mean_ab_fa, fill
   )
 
 gbk_fa <- plot_grid(gbk_ant_fa,gbk_ab_fa,ncol = 2)
-ggsave("GBK_FA.jpeg", plot = gbk_fa, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("GBK_FA.jpeg", plot = gbk_fa, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ### i sirklene
@@ -502,7 +502,7 @@ gbk_problem_c <- ggplot(gbk_summary_data_circles, aes(x = Lokalitet_ny, y = mean
 
 
 gbk_fa_c <- plot_grid(gbk_ab_fa_c,gbk_problem_c,ncol = 2)
-ggsave("GBK_FA.SIRKLER.jpeg", plot = gbk_fa_c, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("GBK_FA.SIRKLER.jpeg", plot = gbk_fa_c, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 
@@ -588,7 +588,7 @@ busk_feltsjikt <- ggplot(busk_summary_data, aes(x = Lokalitet, y = mean_dekning_
   )
 
 busk_veg <- plot_grid(busk_ant_arter,busk_feltsjikt,ncol = 2)
-ggsave("BUSK_veg.jpeg", plot = busk_veg, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("BUSK_veg.jpeg", plot = busk_veg, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 # figurer: antall og dekning av habitatspesialister
@@ -642,7 +642,7 @@ busk_ab_hs <- ggplot(busk_summary_data, aes(x = Lokalitet, y = mean_ab_hs, fill 
   )
 
 busk_hs <- plot_grid(busk_ant_hs,busk_ab_hs,ncol = 2)
-ggsave("BUSK_HS.jpeg", plot = busk_hs, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("BUSK_HS.jpeg", plot = busk_hs, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ## figurer: antall og dekning av rC8dlistearter
@@ -696,7 +696,7 @@ busk_ab_rl <- ggplot(busk_summary_data, aes(x = Lokalitet, y = mean_ab_rl, fill 
   )
 
 busk_rl <- plot_grid(busk_ant_rl,busk_ab_rl,ncol = 2)
-ggsave("BUSK_RL.jpeg", plot = busk_rl, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("BUSK_RL.jpeg", plot = busk_rl, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ### i sirklene
@@ -768,7 +768,7 @@ busk_vedplanter_c <- ggplot(busk_summary_data_circles, aes(x = Lokalitet, y = me
 
 
 busk_vedplanter_figur <- plot_grid(busk_vedplanter_c,busk_ab_fa_c,ncol = 2)
-ggsave("BUSK.SIRKLER.jpeg", plot = busk_vedplanter_figur, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("BUSK.SIRKLER.jpeg", plot = busk_vedplanter_figur, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 
 ## figur: dekning av problemarter i sirklene
@@ -851,7 +851,7 @@ utfordrende_Padda <- ggplot(Psummary_data, aes(x = Tid_num, y = mean_utfordrende
   theme(legend.text = element_text(size=12))+
   theme(legend.title = element_text(size=14))
 
-ggsave("Padda_utfordrende.jpeg", plot = utfordrende_Padda, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("Padda_utfordrende.jpeg", plot = utfordrende_Padda, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
 ## Vi kan forvente at det er en tidsforskyvning mellom slitasjen og dekningen av utfordrende arter
 ## (fC8rst blir det bar jord, sC% koloniserer artene)
@@ -893,5 +893,5 @@ slitasje_problemarter <- ggplot(Pfiltered_data_lag, aes(x = slitasje_t, y = utfo
   theme(legend.text = element_text(size=12))+
   theme(legend.title = element_text(size=14))
 
-ggsave("Padda_slitasje.jpeg", plot = slitasje_problemarter, path = "/data/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/02 Apen grunnlendt kalkmark/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
+ggsave("Padda_slitasje.jpeg", plot = slitasje_problemarter, path = "path/Analyser/GRUK_effekt_2025", width = 10, height = 6, dpi = 300)
 
