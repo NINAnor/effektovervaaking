@@ -1,32 +1,28 @@
 #Elvesandjeger
-#Script for preparing the data into a workable dataframe
+#Script for preparing the data into a workable dataframe #Script is updated because Arne has taken over from Oddvar and uses different headers
 #Author: Megan Nowell
-#Date:2024
+#Date:2025
+
+setwd("path")
 
 # Load the libraries
 library(readxl)
 library(dplyr)
 library(sf)
-library(here)
 
 # Define the file path to your Excel file
-file_path <- here("Elvesandjeger/data/Cicindela-maritima_Gaula2024.xlsx")
+file_path <- "./Elvesandjeger/2025/elvesandjeger_2025.xlsx"
 
 # Read each sheet and add a month column
-data_january <- read_excel(file_path, sheet = "juni") %>%
-  mutate(month = "juni")
+data_june <- read_excel(file_path, sheet = "jun25")
 
-data_february <- read_excel(file_path, sheet = "juli") %>%
-  mutate(month = "juli")
+data_july <- read_excel(file_path, sheet = "jul25")
 
-data_march <- read_excel(file_path, sheet = "august") %>%
-  mutate(month = "august")
+data_august <- read_excel(file_path, sheet = "aug25")
 
-data_april <- read_excel(file_path, sheet = "sept") %>%
-  mutate(month = "september")
 
 # Combine all sheets into a single dataframe
-merged_data <- bind_rows(data_january, data_february, data_march, data_april)
+merged_data <- bind_rows(data_june, data_july, data_august)
 
 # View the merged dataframe
 print(merged_data)
@@ -36,42 +32,48 @@ str(merged_data)
 #Replace zeros in observation columns
 merged_data <- merged_data %>%
   mutate(
-    `3st` = coalesce(`3st`, 0),
-    `2st` = coalesce(`2st`, 0),
-    `1st` = coalesce(`1st`, 0),
-    Voksne = coalesce(Voksne, 0)
+    `stadium 1` = coalesce(`stadium 1`, 0),
+    `stadium 2` = coalesce(`stadium 2`, 0),
+    `stadium 3` = coalesce(`stadium 3`, 0)
   )
+
 
 str(merged_data)
 
 #Change column names so that they don't start with a number
 merged_data <- merged_data %>%
   rename(
-    stad1 = `3st`,
-    stad2 = `2st`,
-    stad3 = `1st`
+    stad1 = `stadium 1`,
+    stad2 = `stadium 2`,
+    stad3 = `stadium 3`
   )
 
 str(merged_data)
+merged_data <- merged_data %>%
+  select(stad1, stad2, stad3, lokalitet, month, lat, lon)
+names(merged_data)
 
 #Now the data is ready to be converted intro a spatial feature
 #Remove any observations with no spatial information
 merged_data <- merged_data %>%
-  filter(!is.na(utm_N) & !is.na(utm_E))
+  filter(!is.na(lon) & !is.na(lat)) #lat = N, long = E
 
 # Convert the dataframe to an sf object using utm_N and utm_E as coordinates
 elvesandjeger <- merged_data %>%
-  st_as_sf(coords = c("utm_E", "utm_N"), crs = 25832)
+  st_as_sf(coords = c("lon", "lat"), crs = 4326) %>%
+  st_transform(crs = 25832)
 
 # View the spatial dataframe
 plot(st_geometry(elvesandjeger))
+head(elvesandjeger)
 
 #Write out data as a shapefile ##NOTE: dateTime field is altered to only date
-st_write(elvesandjeger, "./Elvesandjeger/data/elvesandjeger_2024.shp")
+st_write(elvesandjeger, "./Elvesandjeger/2025/elvesandjeger_2025.shp", append = FALSE)
 
 #Write out only the data observations from August
 august <- elvesandjeger %>%
-  filter(month == "august")
+  filter(month == "August")
 str(august)
+plot(st_geometry(august))
 
-st_write(august,"./Elvesandjeger/data/elvesandjeger_august_2024.shp" )
+st_write(august,"./Elvesandjeger/2025/elvesandjeger_august_2025.shp", append = FALSE )

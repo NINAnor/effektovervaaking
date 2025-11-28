@@ -1,7 +1,4 @@
-#Effektovervaaking - elvesandjeger
-# Step 3: modelling of effect of lupine clearing on elvesandjeger populations
-#author: Megan Nowell
-#date: 2024
+#ELVESANDJEGER EFFECT ANALYSIS
 
 library(dplyr)
 library(sf)
@@ -11,40 +8,68 @@ library(MASS)
 library(tidyr)
 library(pscl)
 library(ggplot2)
+library(glmmTMB)
 
 #ANALYZE THE DATA
-site.obs <- st_read("Elvesandjeger/data/elvesandjeger_results_2024_obs.csv")
+setwd("path")
+
+site.obs <- st_read("./elvesandjeger_results_2025_obs.csv")
+str(site.obs)
+
+years <- 20:24
+
+site.obs <- site_dens_sf #If already loaded from previous
+
+for (yr in years) {
+  site.obs[[paste0("larvae", yr)]] <-
+    round(
+      site.obs[[paste0("S1_", yr)]] +
+        site.obs[[paste0("S2_", yr)]] +
+        site.obs[[paste0("S3_", yr)]]
+    )
+}
+
+head(site.obs)
 str(site.obs)
 
 site.obs <- site.obs %>%
-  mutate(across(matches("^S[1-3]_|^A_"), as.numeric))
-str(site.obs)
-
-site.obs <- site.obs %>%
-  mutate(larvae20 = S1_20+S2_20+S3_20) %>%
-  mutate(larvae21 = S1_21+S2_21+S3_21) %>%
-  mutate(larvae22 = S1_22+S2_22+S3_22) %>%
-  mutate(larvae23 = S1_23+S2_23+S3_23) %>%
-  mutate(larvae24 = S1_24+S2_24+S3_24)
-
-site.obs <- site.obs %>%
-  mutate(larvae20 = round(larvae20)) %>%
-  mutate(larvae21 = round(larvae21)) %>%
-  mutate(larvae22 = round(larvae22)) %>%
-  mutate(larvae23 = round(larvae23)) %>%
-  mutate(larvae24 = round(larvae24))
+  mutate(
+    larvae20 = round((S1_20 + S2_20 + S3_20) * area_m2),
+    larvae21 = round((S1_21 + S2_21 + S3_21) * area_m2),
+    larvae22 = round((S1_22 + S2_22 + S3_22) * area_m2),
+    larvae23 = round((S1_23 + S2_23 + S3_23) * area_m2),
+    larvae24 = round((S1_24 + S2_24 + S3_24) * area_m2),
+    larvae25 = round((S1_25 + S2_25 + S3_25) * area_m2)
+  )
 
 # Remove Follstad sites which are newly cleared in 2024
 site.obs <- site.obs %>%
   filter(!grepl("Follstad", Lokalitet))
 
+#Fix the lokalitet names
+site.obs <- site.obs %>%
+  mutate(
+    site_name = str_remove(Lokalitet, "\\s+\\d+[a-zA-Z]?$"),  # Removes " 56" or " 56a"
+    site_name = str_replace_all(site_name, c("C8" = "o", "C%" = "a", "C&" = "ae",
+                                             "C" = "O", "C" = "A", "C" = "Ae"))
+  )
+
+site.obs <- site.obs %>%
+  mutate(
+    Luket_25 = case_when(
+      Metode_25 == "Luking_delvis" ~ "Delvis",
+      TRUE ~ Luket_25  
+    )
+  )
+
+print(site.obs)
 ################################
 ###Model the effects
 
 # Baseline
-poisson_model <- glm(larvae24 ~ larvae24*Luket_24, family = poisson, data = site.obs)
+poisson_model <- glm(larvae25 ~ Luket_24, family = poisson, data = site.obs)
 summary(poisson_model)
-plot <- plot(simulateResiduals(poisson_model)) #The data are not suited to a glm
+plot <- plot(simulateResiduals(poisson_model)) 
 sim <- simulateResiduals(poisson_model)
 testDispersion(sim)
 
@@ -52,10 +77,10 @@ testDispersion(sim)
 #If this quotient is much greater than one, the negative binomial distribution should be used. 
 deviance_ratio <- poisson_model$deviance / poisson_model$df.residual
 print(deviance_ratio)
-#Very overdispersed = 30.8
+#Very overdispersed = 12.8771
 
 #Check for zero inflation
-observed_zeros <- sum(site.obs$larvae24 == 0)
+observed_zeros <- sum(site.obs$larvae25 == 0)
 
 # Number of predicted zeros from the Poisson model
 predicted_zeros <- sum(predict(poisson_model, type = "response") < 1e-10)
@@ -63,116 +88,241 @@ predicted_zeros <- sum(predict(poisson_model, type = "response") < 1e-10)
 # Print observed vs predicted zeros
 cat("Observed zeros:", observed_zeros, "\n")
 cat("Predicted zeros:", predicted_zeros, "\n") 
-#The data are zero-inflated because there are 56 zeros where none are predicted
+#The data are zero-inflated because there are 72 zeros where none are predicted
 
 #Try a negative binomial model
-nb_model <- glm.nb(larvae24 ~ larvae23 * Luket_24, data = site.obs)
-summary(nb_model)
+m_nb <- glm.nb(larvae25 ~ Luket_24, data = site.obs)
+summary(m_nb)
+
+sim_nb <- simulateResiduals(m_nb)
+plot(sim_nb)
+testDispersion(sim_nb)
 
 #Data is overdispersed and zero-inflated
 # Convert Luket_24 from character to a factor
+site.obs$Luket_25 <- as.factor(site.obs$Luket_25)
 site.obs$Luket_24 <- as.factor(site.obs$Luket_24)
-site.obs$Luket_23 <- as.factor(site.obs$Luket_23)
 
 # Set "Nei" as the reference category
+site.obs$Luket_25 <- relevel(site.obs$Luket_25, ref = "Nei")
 site.obs$Luket_24 <- relevel(site.obs$Luket_24, ref = "Nei")
-site.obs$Luket_23 <- relevel(site.obs$Luket_23, ref = "Nei")
 
 # Refit the zero-inflated negative binomial model
-zinb_model <- zeroinfl(larvae24 ~ Luket_23, dist = "negbin", data = site.obs)
-zinb_model
+zinb_model <- glmmTMB(
+  larvae25 ~ Luket_24,               
+  ziformula = ~1,                     
+  family = nbinom2, 
+  data = site.obs
+)
+
+summary(zinb_model)
+
+#Reshape data
+df <- site.obs %>%
+  st_drop_geometry() %>%
+  dplyr::select(
+    site_name, siteID,
+    matches("^Luket_"), 
+    matches("^Antall_"),
+    matches("^larvae[0-9]{2}$")
+  )
+head(df)
+
+# List the year suffixes
+years <- c("20","21","22","23","24","25")
+
+# Pivot longer for each of the three types of variables
+# Pivot Luket
+luket_long <- df %>%
+  pivot_longer(
+    cols = matches("^Luket_[0-9]{2}$"),
+    names_to = "year_suffix",
+    names_prefix = "Luket_",
+    values_to = "Luket"
+  )
+head(luket_long)
+
+# Pivot Antall
+antall_long <- df %>%
+  pivot_longer(
+    cols = matches("^Antall_[0-9]{2}$"),
+    names_to = "year_suffix",
+    names_prefix = "Antall_",
+    values_to = "Antall"
+  )
+head(antall_long)
+
+# Pivot larvae
+larvae_long <- df %>%
+  pivot_longer(
+    cols = matches("^larvae[0-9]{2}$"),
+    names_to = "year_suffix",
+    names_prefix = "larvae",
+    values_to = "Larvae"
+  )
+
+luket <- luket_long %>%
+  dplyr::select(site_name, siteID, Luket, year_suffix)
+
+antall <- antall_long %>%
+  dplyr::select(siteID, Antall, year_suffix)
+
+larvae <- larvae_long %>%
+  dplyr::select(siteID, Larvae, year_suffix)
+
+
+# Join them all
+long_data <- luket %>%
+  left_join(antall,  by = c("siteID", "year_suffix")) %>%
+  left_join(larvae, by = c("siteID", "year_suffix"))
+
+print(long_data)
+
+# Final cleanup
+long_data <- long_data %>%
+  mutate(
+    year = as.integer(paste0("20", year_suffix)),
+    Luket = factor(Luket, levels = c("Nei", "Delvis", "Ja"))
+  ) %>%
+  dplyr::select(site_name, siteID, year, Luket, Antall, Larvae, everything())
+
+long_data <- long_data %>%
+  mutate(
+    Luket = factor(ifelse(is.na(Luket), "Nei", as.character(Luket)),
+                   levels = c("Nei", "Delvis", "Ja")),
+    Larvae = ifelse(is.na(Larvae) | is.nan(Larvae), 0, Larvae)
+  )
+
+
+# Check the result
+head(long_data)
+str(long_data)
+unique(long_data$Luket)
+sum(is.na(long_data$Luket))
+
+write.csv(long_data, "./Elvesandjeger/elvesandjeger_results_2025_obs_long.csv", row.names = FALSE)
+
+long_data <- read.csv("./Elvesandjeger/elvesandjeger_results_2025_obs_long.csv")
+
+#Test effect of clearing over time
+m1 <- glmmTMB(
+  Larvae ~ Luket + (1 | siteID),
+  family = nbinom2,
+  data = long_data
+)
+summary(m1)
+
+long_data <- long_data %>%
+  arrange(siteID, year) %>%
+  group_by(siteID) %>%
+  mutate(Larvae_lag1 = lag(Larvae)) %>%
+  ungroup()
+
+lag_model <- glmmTMB(
+  Larvae ~ Larvae_lag1 * Luket + (1 | siteID),
+  family = nbinom2,
+  data = long_data
+)
+
+summary(lag_model)  # Not significant
+
 
 #Determine the effect of clearing history
 #How many times has a site been cleared
-site.obs <- site.obs %>%
-  mutate(Luket_count = rowSums(across(c(Luket_20, Luket_21, Luket_22, Luket_23, Luket_24), ~ . == "Ja")))
-str(site.obs)
+site_clearing_summary <- long_data %>%
+  filter(Luket %in% c("Ja", "Delvis")) %>%
+  group_by(siteID) %>%
+  summarise(
+    last_cleared_summary = max(year),
+    times_cleared_summary = n(),
+    .groups = "drop"
+  )
 
-#When was site last cleared
-site.obs <- site.obs %>%
-  mutate(last_cleared = case_when(
-    Luket_24 %in% c("Ja", "Delvis") ~ 2024,
-    Luket_23 %in% c("Ja", "Delvis") ~ 2023,
-    Luket_22 %in% c("Ja", "Delvis") ~ 2022,
-    Luket_21 %in% c("Ja", "Delvis") ~ 2021,
-    Luket_20 %in% c("Ja", "Delvis") ~ 2020,
-    TRUE ~ NA_real_
-  )) %>%
-  mutate(years_last_clearing = 2024 - last_cleared)
-str(site.obs)
+long_data <- long_data %>%
+  left_join(site_clearing_summary, by = "siteID") %>%
+  mutate(
+    years_since_clearing = ifelse(!is.na(last_cleared_summary) & year >= last_cleared_summary,
+                                  year - last_cleared_summary,
+                                  NA_real_)
+  )
+print(long_data)
+write.csv(long_data, "./Elvesandjeger/2025/Elvesandjeger_clearing_2025_long.csv")
 
-#How many times has a site been cleared
-site.history <- site.obs %>%
-  mutate(times_cleared = rowSums(across(c(Luket_20, Luket_21, Luket_22, Luket_23, Luket_24), 
-                                        ~ . %in% c("Ja", "Delvis"))))
-site.history <- site.history %>%
-  filter(times_cleared > 0)
-
-ggplot(site.history, aes(x = as.factor(times_cleared), y = larvae24)) +
+long_data %>%
+  filter(year == 2025, !is.na(last_cleared_summary)) %>%
+  ggplot(aes(x = factor(last_cleared_summary), y = Larvae)) +
   geom_boxplot() +
+  facet_wrap(~ site_name)+
   scale_y_log10() +
-  labs(x = "Antall ganger luket", 
-       y = "Antall larver i 2024 (log transformert)") +
+  labs(x = "Siste luket", 
+       y = "Antall larver (log transformert)") +
   theme_minimal()
 
-#When was the site last cleared
-site.obs <- site.obs %>%
-  mutate(last_cleared = as.factor(last_cleared))
+#How many times has a site been cleared
+# Plot for 2025
+long_data %>%
+  filter(year == 2025, !is.na(times_cleared_summary)) %>%
+  ggplot(aes(x = as.factor(times_cleared_summary), y = Larvae)) +
+  geom_boxplot() +
+  facet_wrap(~site_name)+
+  scale_y_log10() +
+  labs(x = "Antall ganger luket", 
+       y = "Antall larver i 2025 (log transformert)") +
+  theme_minimal()
 
-n_cleared_model <- zeroinfl(larvae24 ~ last_cleared, dist = "negbin", data = site.obs)
-n_cleared_model
+check <- long_data %>%
+  filter(year == 2025, times_cleared_summary == 3)
+check
 
+unique(long_data$site_name)
 #Explore other ways to visualise the data
 
 #Boxplots
-#Reorder the names in Luket_* columns and remove where Luket_* == NA
-site.obs <- site.obs %>%
-  mutate(across(starts_with("Luket_"), 
-                ~ factor(.x, levels = c("Nei", "Delvis", "Ja"))))
-
-#2024
-obs24_presence <- site.obs %>%
-  filter(!larvae24 == 0)
-ggplot(obs24_presence, aes(x = Luket_24, y = larvae24)) +
+#2025
+# Plot
+ggplot(obs25_presence, aes(x = Luket, y = Larvae)) +
   geom_boxplot() +
   scale_y_log10() +
-  labs(x = "Luket i 2024", 
-       y = "Antall larver i 2024 (log transformert)") +
+  #facet_wrap(~site_name)+
+  labs(x = "Luking i 2025", 
+       y = "Antall larver i 2025") +
   theme_minimal()
 
-#2023
-obs23_presence <- site.obs %>%
-  filter(!larvae23 == 0) %>%
-  filter(!Luket_23 == 'NA')
-ggplot(obs23_presence, aes(x = Luket_23, y = larvae23)) +
+plot_data <- long_data %>%
+  dplyr::select(site_name, siteID, year, Larvae, Luket) %>%
+  pivot_wider(
+    id_cols = c(site_name, siteID),
+    names_from = year,
+    values_from = c(Larvae, Luket),
+    names_sep = "_"
+  ) %>%
+  # Rename for clarity
+  rename(
+    Larvae = Larvae_2025,
+    Luket_prev = Luket_2024
+  )
+
+# Order categories logically
+plot_data$Luket_prev <- factor(plot_data$Luket_prev, levels = c("Nei", "Delvis", "Ja"))
+
+# Plot
+ggplot(plot_data, aes(x = Luket_prev, y = Larvae)) +
   geom_boxplot() +
   scale_y_log10() +
-  labs(x = "Luket i 2023", 
-       y = "Antall larver i 2023 (log transformert)") +
-  theme_minimal()
-
-#2022
-obs22_presence <- site.obs %>%
-  filter(!larvae22 == 0) %>%
-  filter(!Luket_22 == 'NA')
-ggplot(obs22_presence, aes(x = Luket_22, y = larvae22)) +
-  geom_boxplot() +
-  scale_y_log10() +
-  labs(x = "Luket i 2022", 
-       y = "Antall larver i 2022 (log transformert)") +
-  theme_minimal()
-
-#2021 ### Only showing NA
-obs21_presence <- site.obs %>%
-  filter(!larvae21 == 0)
-ggplot(obs21_presence, aes(x = Luket_21, y = larvae21)) +
-  geom_boxplot() +
-  scale_y_log10() +
-  labs(x = "Luket i 2021", 
-       y = "Antall larver i 2021 (log transformert)") +
-  theme_minimal()
-
+  #facet_wrap(~site_name) +
+  labs(
+    x = "Luking i 2024",
+    y = "Antall larver i 2025",
+    #title = "Effekt av luking i 2024 pC% larver i 2025"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(size = 14),
+    axis.text.y = element_text(size = 14),
+    axis.title.x = element_text(size = 16),
+    axis.title.y = element_text(size = 16)
+  )
 
 #Write out data
-st_write(site.obs, "./Elvesandjeger/data/elvesandjeger_clearing_history_2020-2024.csv", delete_layer = TRUE)
+st_write(site.obs, "elvesandjeger_clearing_history_2020-2024.csv", delete_layer = TRUE)
 
