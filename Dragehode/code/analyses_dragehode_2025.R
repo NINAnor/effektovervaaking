@@ -18,7 +18,7 @@ library(here)
 library(data.table)
 
 
-df <- readxl::read_excel("path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Data/Effekt_dragehode_cleaned/Dragehode_2025_cleaned.xlsx")
+df <- readxl::read_excel("path/Dragehode_2025_cleaned.xlsx")
 
 #Calculate species richness
 df <- df %>% 
@@ -49,7 +49,7 @@ p.richness <- df %>%
   labs(x = "SkjC8tsel", y = "Antall karplantearter") +
   scale_y_continuous(expand = c(0, 0))
 
-ggsave(plot = p.richness, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum//Output/species_richness_25.jpeg", width = 12, height = 8, units = "cm")
+ggsave(plot = p.richness, filename = "path/species_richness_25.jpeg", width = 12, height = 8, units = "cm")
 
 #Do a simple anova (non-parametric transformed rank tests give the same results)
 aov_richness <- df %>% 
@@ -120,7 +120,7 @@ p.nectar_dekning <- df %>%
   labs(x = "SkjC8tsel", y = "Dekning pollinatorplanter (%)") +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 50), oob=rescale_none)
 
-ggsave(plot = p.nectar_dekning, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/nectar_dekning_25.jpeg", width = 12, height = 8, units = "cm")
+ggsave(plot = p.nectar_dekning, filename = "path/nectar_dekning_25.jpeg", width = 12, height = 8, units = "cm")
 
 #Do anova
 aov_nectar <- df %>% 
@@ -155,7 +155,7 @@ p.dragehode <- df %>%
   labs(x = "SkjC8tsel", y = "Antall dragehodeplanter") +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 26), oob=rescale_none)
 
-ggsave(plot = p.dragehode, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/dragehode_count_25.jpeg", width = 12, height = 8, units = "cm")
+ggsave(plot = p.dragehode, filename = "path/dragehode_count_25.jpeg", width = 12, height = 8, units = "cm")
 
 #Do a simple ANOVA
 
@@ -190,7 +190,7 @@ p.dragehode_dekning <- p.dragehodedekning <- df %>%
   labs(x = "SkjC8tsel", y = "Dekning dragehode (%)") +
   scale_y_continuous(expand = c(0, 0), limits = c(0, 26), oob=rescale_none)
 
-ggsave(plot = p.dragehode_dekning, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/dragehode_cover_25.jpeg", width = 12, height = 8, units = "cm")
+ggsave(plot = p.dragehode_dekning, filename = "path/dragehode_cover_25.jpeg", width = 12, height = 8, units = "cm")
 
 #Do a simple anova
 
@@ -206,7 +206,7 @@ summary(aov_dekning)
 
 p.dragehode_all <- ggarrange(p.richness, p.nectar_dekning, p.dragehode, p.dragehode_dekning, labels = c("a", "b", "c", "d"), common.legend = TRUE, legend = "none", ncol = 2, nrow = 2)
 
-ggsave(plot = p.dragehode_all, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/dragehode_all_25.jpeg", width = (24), height = (16), units = "cm")
+ggsave(plot = p.dragehode_all, filename = "path/dragehode_all_25.jpeg", width = (24), height = (16), units = "cm")
 
 
 #Dragehode count per class
@@ -233,7 +233,7 @@ p.dragehode_classes <- df %>%
   labs(x = "SkjC8tsel", y = "Antall dragehodeplanter") +
   scale_y_continuous(expand = c(0, 0), limits = c(0,50))
 
-ggsave(plot = p.dragehode_classes, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/dragehode_classes_25.jpeg", width = (12*1.5), height = (8*1.5), units = "cm")
+ggsave(plot = p.dragehode_classes, filename = "path/dragehode_classes_25.jpeg", width = (12*1.5), height = (8*1.5), units = "cm")
 
 df %>% 
   group_by(year, plot_id_full) %>% 
@@ -324,7 +324,7 @@ p.dragehode_nmds <- ggplot(nmds_scores, aes(x = NMDS1, y = NMDS2, color = Treatm
   scale_color_manual(values=c("#004F71","#E57200","#008C95")) +   # Points colors by Year
   scale_fill_manual(values=c("#004F71","#E57200","#008C95"))     # Centroid points colored by Year
 
-ggsave(plot = p.dragehode_nmds, filename = "path/03 Dragehode/Dracocephalum/Effektovervaaking-Dracocephalum/Output/dragehode_nmds_2025.jpeg", width = (20), height = (16), units = "cm")
+ggsave(plot = p.dragehode_nmds, filename = "path/dragehode_nmds_2025.jpeg", width = (20), height = (16), units = "cm")
 
 
 #Do permanova analysis
