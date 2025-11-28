@@ -14,7 +14,7 @@ library(MuMIn)
 library(effects)
 
 # importing data
-dat <- readxl::read_excel("~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Data/Effekt_prikkrutevinge_2025_cleaned.xlsx")
+dat <- readxl::read_excel("path/Effekt_prikkrutevinge_2025_cleaned.xlsx")
 
 # Data calculations
 #We want to calculate average vegetation height per plot, per year
@@ -138,7 +138,7 @@ s.veg_height <- dat_agg %>%
 # Print the plot
 s.veg_height
 
-ggsave(plot = s.veg_height, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_vegheight_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.veg_height, filename = "path/prikkrutevinge_vegheight_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 # test for differences
 
@@ -190,7 +190,7 @@ s.plantago <- dat_agg %>%
 # Print the plot
 s.plantago
 
-ggsave(plot = s.plantago, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_plantago_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.plantago, filename = "path/prikkrutevinge_plantago_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 # test for differences
 tapply(dat_agg$count_plantago,list(dat_agg$year,dat_agg$Spinnrute),mean)
@@ -244,7 +244,7 @@ s.pollinator <- dat_agg %>%
 # Print the plot
 s.pollinator
 
-ggsave(plot = s.pollinator, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_pollinators_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.pollinator, filename = "path/prikkrutevinge_pollinators_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 # test for differences
 tapply(dat_agg$Total_count_flowers,list(dat_agg$year,dat_agg$Spinnrute),mean)
@@ -309,7 +309,7 @@ s.litter <- dat_agg %>%
 # Print the plot
 s.litter
 
-ggsave(plot = s.litter, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_litter_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.litter, filename = "path/prikkrutevinge_litter_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 # test for differences
 tapply(dat_agg$cover_standing_litter,list(dat_agg$year,dat_agg$Spinnrute),mean)
@@ -368,7 +368,7 @@ s.short <- dat_agg %>%
 # Print the plot
 s.short
 
-ggsave(plot = s.short, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_short_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.short, filename = "path/prikkrutevinge_short_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 # test for differences
 tapply(dat_agg$cover_short_vegetation,list(dat_agg$year,dat_agg$Spinnrute),mean)
@@ -418,7 +418,7 @@ s.spinn <- dat_agg %>%
 # Print the plot
 s.spinn
 
-ggsave(plot = s.spinn, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_spinn_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = s.spinn, filename = "path/prikkrutevinge_spinn_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 
 table(dat_agg$Spinnrute, dat_agg$year, dat_agg$Presence_larvespinn)
@@ -482,7 +482,7 @@ dat_species_wide <- dat_species_raw %>%
 dat_species_rel <-         
   decostand(dat_species_wide, method = "total")
 #Export this dataset
-#write.csv(dat_species_rel, "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Data/Data_Prikkrutevinge_2025_Species_rel.csv")
+#write.csv(dat_species_rel, "path/Data_Prikkrutevinge_2025_Species_rel.csv")
 
 #Create bray-curtiss distance matrix
 prikk_species_distmat <- 
@@ -562,7 +562,7 @@ nmds.plot.prikk <- ggplot(site.scrs, aes(x = NMDS1, y = NMDS2)) +
                "Nei" = "#E57200")  # oransje
   )
 
-ggsave(plot = nmds.plot.prikk, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_nmds_spinn25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = nmds.plot.prikk, filename = "path/prikkrutevinge_nmds_spinn25.jpeg", width = 21, height = 14, units = "cm")
 
 
 # #add important species
@@ -714,7 +714,7 @@ p.veg_height <- dat_agg %>%
 # Print the plot
 p.veg_height
 
-ggsave(plot = p.veg_height, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_veg_height25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = p.veg_height, filename = "path/prikkrutevinge_veg_height25.jpeg", width = 21, height = 14, units = "cm")
 
 # Make same figure for the number of smalkjempe
 p.host <- dat_agg %>% 
@@ -739,7 +739,7 @@ p.host <- dat_agg %>%
 p.host
 
 
-ggsave(plot = p.host, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_smalkjemperosetter25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = p.host, filename = "path/prikkrutevinge_smalkjemperosetter25.jpeg", width = 21, height = 14, units = "cm")
 
 # Make same figure for number of flowering stems
 p.pollinator <- dat %>% 
@@ -767,7 +767,7 @@ p.pollinator <- dat %>%
 
 p.pollinator
 
-ggsave(plot = p.pollinator, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_pollinator_planter25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = p.pollinator, filename = "path/prikkrutevinge_pollinator_planter25.jpeg", width = 21, height = 14, units = "cm")
 
 # Same figure for standing dead litter
 
@@ -792,7 +792,7 @@ p.litter <- dat_agg %>%
 
 p.litter
 
-ggsave(plot = p.litter, filename = "~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/07 Prikkrutevinge/Effektovervaaking_prikkrutevinge/Output/prikkrutevinge_standing_litter25.jpeg", width = 21, height = 14, units = "cm")
+ggsave(plot = p.litter, filename = "path/prikkrutevinge_standing_litter25.jpeg", width = 21, height = 14, units = "cm")
 
 
 ### table showing how many plots with how many treatments - for each locality
