@@ -41,7 +41,7 @@ There are several datasets to load here. Each logger has a file name with the lo
 
 {r}
 
-data_folder <- "path ~/Mounts/P-Prosjekter2/154027_effektovervaking_av_trua_arter_og_naturtyper_2024/08 TrC8nderlav/TrC8nderlav/data/climate_loggers"
+data_folder <- "path"
 
 # 1. List all CSV files
 files <- list.files(path = data_folder, pattern = "\\.csv$", full.names = TRUE)
